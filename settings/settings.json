@@ -39,12 +39,8 @@
         "description": "Base font size for chat while watching a stream. Emotes/Badges/Etc scale based on this value.",
         "settingName": "ChatFontSize",
         "type": "radio",
-        "default": "14",
+        "default": "20",
         "options": [
-            {
-                "title": "10",
-                "id": "10"
-            },
             {
                 "title": "12",
                 "id": "12"
@@ -64,6 +60,22 @@
             {
                 "title": "20",
                 "id": "20"
+            },
+            {
+                "title": "22",
+                "id": "22"
+            },
+            {
+                "title": "24",
+                "id": "24"
+            },
+            {
+                "title": "26",
+                "id": "26"
+            },
+            {
+                "title": "28",
+                "id": "28"
             }
         ]
     },

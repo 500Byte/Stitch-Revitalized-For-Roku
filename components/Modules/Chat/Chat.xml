@@ -3,7 +3,8 @@
 <component name="Chat" extends="Group">
 
     <interface>
-        <field id="backgroundColor" type="string" value="0x000000FF" alias="chatBackground.color, chatPanel.color" />
+        <field id="backgroundColor" type="string" value="0x000000FF" alias="chatBackground.color" />
+        <field id="backgroundOpacity" type="float" value="1.0" alias="chatBackground.opacity" />
         <field id="channel" type="string" onChange="onEnterChannel" alwaysNotify="true" />
         <field id="channel_id" type="string" />
         <field id="focusable" type="Boolean" value="true" />
@@ -11,14 +12,14 @@
         <field id="doneFocus" type="Boolean" value="false" />
         <field id="clientInfo" type="assocarray" />
         <field id="clientMessage" type="string" value="" />
-        <field id="width" type="integer" value="275" alias="chatPanel.width, chatBackground.width" onchange="updatePanelTranslation" />
+        <field id="width" type="integer" value="380" alias="chatPanel.width, chatBackground.width" onchange="updatePanelTranslation" />
         <field id="height" type="integer" value="1080" alias="chatPanel.height, chatBackground.height" onChange="updatePanelTranslation" />
         <field id="forceLive" type="bool" value="false" />
         <field id="isVod" type="bool" value="false" />
         <field id="videoId" type="string" value="" />
         <field id="videoPosition" type="float" value="0.0" onChange="onVideoPositionChange" alwaysNotify="true" />
         <field id="translation" type="vector2d" alias="chatPanel.translation" />
-        <field id="fontSize" type="integer" value="14" onChange="updatePanelTranslation" />
+        <field id="fontSize" type="integer" value="20" onChange="updatePanelTranslation" />
         <function name="stopJobs" />
     </interface>
 
@@ -34,6 +35,7 @@
                 width="1920"
                 height="1080"
                 opacity="1"
+                color="0x000000FF"
                 translation="[0,0]" />
             <Rectangle
                 id="chatPanel"
@@ -41,6 +43,7 @@
                 width="1920"
                 height="1080"
                 opacity="1"
+                color="0x00000000"
                 translation="[0,0]" />
         </MaskGroup>
         <!-- <SimpleLabel

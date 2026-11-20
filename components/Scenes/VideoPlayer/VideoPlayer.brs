@@ -114,11 +114,11 @@ sub initChat()
         m.chatWindow.channel_id = m.top.contentRequested.streamerId
         m.chatWindow.channel = m.top.contentRequested.streamerLogin
         if get_user_setting("ChatOption", "true") = "true"
-            m.chatWindow.visible = true
-            m.video.chatIsVisible = m.chatWindow.visible
+            m.chatLayoutMode = 1
         else
-            m.chatWindow.visible = false
+            m.chatLayoutMode = 0
         end if
+        setChatLayoutMode(m.chatLayoutMode)
     end if
 end sub
 
@@ -516,34 +516,62 @@ sub onToggleChat()
         if not isChatEnabled()
             showChatOffNotice()
         else if m.chatWindow <> invalid
-            m.chatWindow.visible = not m.chatWindow.visible
-            m.video.chatIsVisible = m.chatWindow.visible ' Update video component's knowledge
+            if m.chatLayoutMode = invalid then m.chatLayoutMode = 0
+            m.chatLayoutMode = (m.chatLayoutMode + 1) mod 3
+            setChatLayoutMode(m.chatLayoutMode)
         end if
         m.video.toggleChat = false ' Reset the flag on the video component
     end if
 end sub
 
-sub onChatVisibilityChange()
-    if m.chatWindow <> invalid and m.video <> invalid
-        screenWidth = m.global.constants.screenWidth
-        screenHeight = m.global.constants.screenHeight
-        chatWidth = 320
-        if m.chatWindow.visible
-            m.chatWindow.translation = [screenWidth - chatWidth, 0] ' Position chat on the right
-            m.chatWindow.height = screenHeight ' Full height
-            m.chatWindow.width = chatWidth
+sub setChatLayoutMode(mode as integer)
+    if m.chatWindow = invalid or m.video = invalid then return
 
-            m.video.width = screenWidth - chatWidth ' Video width adjusted
-            m.video.height = screenHeight ' Video full height
-            m.video.translation = [0, 0] ' Video on the left
-            m.video.chatIsVisible = true
-        else
-            m.video.width = screenWidth ' Video full width
-            m.video.height = screenHeight
-            m.video.translation = [0, 0]
-            m.video.chatIsVisible = false
-        end if
+    screenWidth = m.global.constants.screenWidth
+    screenHeight = m.global.constants.screenHeight
+    chatWidth = 380
+
+    m.chatLayoutMode = mode
+
+    if mode = 1
+        ' Mode 1: Sidebar (Lado a lado, fondo negro solido, video redimensionado a la izquierda)
+        m.chatWindow.visible = true
+        m.chatWindow.backgroundOpacity = 1.0
+        m.chatWindow.translation = [screenWidth - chatWidth, 0]
+        m.chatWindow.height = screenHeight
+        m.chatWindow.width = chatWidth
+
+        m.video.width = screenWidth - chatWidth
+        m.video.height = screenHeight
+        m.video.translation = [0, 0]
+        m.video.chatIsVisible = true
+        m.video.streamLayoutMode = 1
+    else if mode = 2
+        ' Mode 2: Superpuesto / Overlay (Video a pantalla completa, chat flotante a la derecha con fondo semitransparente)
+        m.chatWindow.visible = true
+        m.chatWindow.backgroundOpacity = 0.65
+        m.chatWindow.translation = [screenWidth - chatWidth, 0]
+        m.chatWindow.height = screenHeight
+        m.chatWindow.width = chatWidth
+
+        m.video.width = screenWidth
+        m.video.height = screenHeight
+        m.video.translation = [0, 0]
+        m.video.chatIsVisible = false
+        m.video.streamLayoutMode = 2
+    else
+        ' Mode 0: Oculto (Video a pantalla completa, chat apagado)
+        m.chatWindow.visible = false
+        m.video.width = screenWidth
+        m.video.height = screenHeight
+        m.video.translation = [0, 0]
+        m.video.chatIsVisible = false
+        m.video.streamLayoutMode = 0
     end if
+end sub
+
+sub onChatVisibilityChange()
+    ' Handled via setChatLayoutMode
 end sub
 
 ' Placeholder for onPositionChanged, onVideoStateChange, onVideoError, onDurationChanged

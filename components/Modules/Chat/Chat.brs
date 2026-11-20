@@ -1,6 +1,9 @@
 sub init()
     m.chatPanel = m.top.findNode("chatPanel")
     m.maskgroup = m.top.findNode("maskGroup")
+    if m.chatPanel <> invalid
+        m.chatPanel.color = "0x00000000"
+    end if
     setChatPanelSize()
     setSizingParameters()
     ' determines how far down the screen the first message will appear
