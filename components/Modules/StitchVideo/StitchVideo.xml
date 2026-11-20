@@ -45,24 +45,18 @@
     <script type="text/brightscript" uri="pkg:/source/utils/analytics.brs" />
     <children>
         <!-- your existing children stay the same -->
-        <!-- Modern Floating HUD for Live Streams -->
+        <!-- Modern Floating HUD for Live Streams (Punto Medio LG + Apple TV) -->
         <Group id="controlOverlay" visible="false">
             <!-- Top Scrim Gradient -->
-            <Poster uri="pkg:/images/scrim_top.png" width="1920" height="260" loadDisplayMode="scaleToFit" translation="[0,0]" />
+            <Poster uri="pkg:/images/scrim_top.png" width="1920" height="180" loadDisplayMode="scaleToFit" translation="[0,0]" />
 
-            <!-- Bottom Scrim Gradient -->
-            <Poster uri="pkg:/images/scrim_bottom.png" width="1920" height="300" loadDisplayMode="scaleToFit" translation="[0,780]" />
+            <!-- Bottom Scrim Gradient (Cinema Contrast) -->
+            <Poster uri="pkg:/images/scrim_bottom.png" width="1920" height="340" loadDisplayMode="scaleToFit" translation="[0,740]" />
 
-            <!-- Top Floating Header (Channel & Stream Metadata) -->
-            <Group id="topOverlayGroup" translation="[60,48]">
-                <CirclePoster id="avatar" width="60" height="60" translation="[0,0]" />
-                <SimpleLabel id="channelUsername" translation="[76,2]" text="Channel Name" color="0xFFFFFFFF" fontSize="28" fontUri="pkg:/fonts/Archivo-Bold.otf" />
-                <EmojiLabel id="videoTitle" height="30" maxWidth="1100" horizAlign="left" color="0xADADB8FF" translation="[76,36]">
-                    <Font role="font" uri="pkg:/fonts/Archivo-Regular.otf" size="20" />
-                </EmojiLabel>
-                
+            <!-- Top Floating Header (Live Indicator & Uptime) -->
+            <Group id="topOverlayGroup" translation="[0,48]">
                 <!-- Live Indicator & Uptime Badge (Top Right) -->
-                <Group id="liveIndicator" translation="[1460,10]">
+                <Group id="liveIndicator" translation="[1630,0]">
                     <Rectangle id="liveCapsuleBg" color="0x18181BE6" width="220" height="36" />
                     <Group id="liveBadgeGroup" translation="[4, 4]">
                         <Rectangle id="liveBadgeBg" color="0xEB0400FF" width="76" height="28" />
@@ -72,38 +66,45 @@
                 </Group>
             </Group>
 
-            <!-- Bottom Floating HUD (Seekbar & Controls) -->
-            <Group id="bottomOverlayGroup" translation="[60,850]">
-                <!-- Progress Bar Section (Full Twitch Purple for Live) -->
-                <Rectangle id="progressBarBase" color="0x3A3A3DFF" width="1800" height="8" translation="[0,28]" />
-                <Rectangle id="progressBarProgress" color="0x9146FFFF" width="1800" height="8" translation="[0,28]" />
+            <!-- Bottom Floating HUD: Seekbar (Full Twitch Purple for Live) -->
+            <Group id="bottomOverlayGroup" translation="[70,835]">
+                <Rectangle id="progressBarBase" color="0x3A3A3DFF" width="1780" height="8" translation="[0,26]" />
+                <Rectangle id="progressBarProgress" color="0x9146FFFF" width="1780" height="8" translation="[0,26]" />
             </Group>
 
-            <!-- Action Capsules Row (Live Stream Layout) -->
-            <Group id="actionControlsGroup" translation="[787,935]">
-                <!-- 0: Back Button -->
-                <Group id="backGroup" translation="[0,0]">
+            <!-- Bottom Left: Channel & Stream Metadata (LG TV Anchor) -->
+            <Group id="channelInfoGroup" translation="[70,892]">
+                <CirclePoster id="avatar" width="60" height="60" translation="[0,0]" />
+                <SimpleLabel id="channelUsername" translation="[76,4]" text="Channel Name" color="0xFFFFFFFF" fontSize="22" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+                <EmojiLabel id="videoTitle" height="28" maxWidth="1400" horizAlign="left" color="0xADADB8FF" translation="[76,34]">
+                    <Font role="font" uri="pkg:/fonts/Archivo-Regular.otf" size="16" />
+                </EmojiLabel>
+            </Group>
+
+            <!-- Bottom Right: Action Capsules Row (Apple TV Pills) -->
+            <Group id="actionControlsGroup" translation="[1592,890]">
+                <!-- Hidden Back Button (node preserved for compatibility) -->
+                <Group id="backGroup" visible="false">
                     <Poster id="backBg" uri="pkg:/images/capsule.9.png" width="64" height="56" blendColor="0x26262CBB" />
                     <Poster id="backFocus" uri="pkg:/images/capsule.9.png" width="64" height="56" blendColor="0x9146FFFF" visible="false" />
-                    <Poster uri="pkg:/images/icons/arrow-left.png" width="30" height="30" blendColor="0xFFFFFFFF" translation="[17,13]" />
                 </Group>
 
-                <!-- 1: Chat Toggle Button -->
-                <Group id="chatGroup" translation="[82,0]">
-                    <Poster id="chatBg" uri="pkg:/images/capsule.9.png" width="72" height="56" blendColor="0x26262CBB" />
-                    <Poster id="chatFocus" uri="pkg:/images/capsule.9.png" width="72" height="56" blendColor="0x9146FFFF" visible="false" />
-                    <Poster id="messagesButton" uri="pkg:/images/icons/chat-bubble.png" width="30" height="30" blendColor="0xFFFFFFFF" translation="[21,13]" />
-                </Group>
-
-                <!-- 2: Play/Pause Hero Button -->
-                <Group id="playPauseGroup" translation="[172,-4]">
+                <!-- 0: Play/Pause Hero Button -->
+                <Group id="playPauseGroup" translation="[0,0]">
                     <Poster id="playPauseBg" uri="pkg:/images/capsule.9.png" width="92" height="64" blendColor="0x3A3A3DEE" />
                     <Poster id="playPauseFocus" uri="pkg:/images/capsule.9.png" width="92" height="64" blendColor="0x9146FFFF" visible="false" />
                     <Poster id="controlButton" uri="pkg:/images/icons/pause-hero.png" width="36" height="36" blendColor="0xFFFFFFFF" translation="[28,14]" />
                 </Group>
 
-                <!-- 3: Quality Button -->
-                <Group id="qualityGroup" translation="[282,0]">
+                <!-- 1: Chat Toggle Button -->
+                <Group id="chatGroup" translation="[110,4]">
+                    <Poster id="chatBg" uri="pkg:/images/capsule.9.png" width="72" height="56" blendColor="0x26262CBB" />
+                    <Poster id="chatFocus" uri="pkg:/images/capsule.9.png" width="72" height="56" blendColor="0x9146FFFF" visible="false" />
+                    <Poster id="messagesButton" uri="pkg:/images/icons/chat-bubble.png" width="30" height="30" blendColor="0xFFFFFFFF" translation="[21,13]" />
+                </Group>
+
+                <!-- 2: Quality Button -->
+                <Group id="qualityGroup" translation="[194,4]">
                     <Poster id="qualityBg" uri="pkg:/images/capsule.9.png" width="64" height="56" blendColor="0x26262CBB" />
                     <Poster id="qualityFocus" uri="pkg:/images/capsule.9.png" width="64" height="56" blendColor="0x9146FFFF" visible="false" />
                     <Poster id="qualitySelectButton" uri="pkg:/images/icons/settings-gear.png" width="30" height="30" blendColor="0xFFFFFFFF" translation="[17,13]" />

@@ -87,7 +87,7 @@ sub init()
     m.avatar = m.top.findNode("avatar")
 
     ' State variables
-    m.currentFocusedButton = 3 ' 0=back, 1=timetravel, 2=rewind, 3=play/pause, 4=fastforward, 5=chat
+    m.currentFocusedButton = 1 ' 0=rewind, 1=play/pause, 2=fastforward, 3=timetravel, 4=chat, 5=settings
     m.isOverlayVisible = false
     m.isTimeTravelDialogOpen = false
     m.timeTravelFocusedField = 0 ' 0-5 for time fields, 6-7 for buttons
@@ -203,9 +203,9 @@ sub updateUIForVideoType()
         m.progressDot.visible = false
 
         ' Adjust button focus indices for live streams
-        ' 0=back, 1=play/pause, 2=chat
-        if m.currentFocusedButton = 1 or m.currentFocusedButton = 2 or m.currentFocusedButton = 4
-            m.currentFocusedButton = 1 ' Focus play/pause for live
+        ' 0=play/pause, 1=chat, 2=settings
+        if m.currentFocusedButton > 2
+            m.currentFocusedButton = 0 ' Focus play/pause for live
         end if
         focusButton(m.currentFocusedButton) ' <-- keep focus visuals in sync
     else
@@ -301,51 +301,51 @@ sub onVideoStateChange()
 end sub
 
 sub onChatVisibilityChange()
-    chatW = 400
+    chatW = 495
     if m.global.constants <> invalid and m.global.constants.chatWidth <> invalid and m.global.constants.chatWidth > 0
         chatW = m.global.constants.chatWidth
     end if
 
-    ' Adjust layout based on chat visibility
+    ' Adjust layout based on chat visibility (Punto Medio LG + Apple TV)
     if m.top.chatIsVisible
-        targetWidth = 1800 - chatW
-        if targetWidth < 1200 then targetWidth = 1200
-        m.progressBarBase.width = targetWidth
+        videoW = 1920 - chatW
+        if videoW < 1200 then videoW = 1200
+        seekW = videoW - 115
+        m.progressBarBase.width = seekW
 
-        ' Recenter action buttons in visible video area: (1920 - chatW - buttonsWidth) / 2
-        buttonsW = 596
-        newButtonsX = Int((1920 - chatW - buttonsW) / 2)
-        if newButtonsX < 60 then newButtonsX = 60
+        buttonsW = 514
+        buttonsX = videoW - 45 - buttonsW
+        if buttonsX < 700 then buttonsX = 700
         if m.actionControlsGroup <> invalid
-            m.actionControlsGroup.translation = [newButtonsX, 935]
+            m.actionControlsGroup.translation = [buttonsX, 890]
         end if
 
         ' Adjust right timestamp label coordinate
         if m.timeDuration <> invalid
-            m.timeDuration.translation = [targetWidth - 80, 0]
+            m.timeDuration.translation = [seekW - 100, -2]
         end if
 
-        ' Constrain video title width so it does not overlap with chat
+        ' Constrain video title width so it does not overlap with actions
         if m.videoTitle <> invalid
-            m.videoTitle.maxWidth = targetWidth - 200
+            m.videoTitle.maxWidth = buttonsX - 70 - 76 - 30
         end if
 
         if m.liveIndicator <> invalid
-            m.liveIndicator.translation = [1080, 6]
+            m.liveIndicator.translation = [videoW - 270, 48]
         end if
     else
-        m.progressBarBase.width = 1800
+        m.progressBarBase.width = 1780
         if m.actionControlsGroup <> invalid
-            m.actionControlsGroup.translation = [662, 935]
+            m.actionControlsGroup.translation = [1336, 890]
         end if
         if m.timeDuration <> invalid
-            m.timeDuration.translation = [1720, 0]
+            m.timeDuration.translation = [1680, -2]
         end if
         if m.videoTitle <> invalid
-            m.videoTitle.maxWidth = 1100
+            m.videoTitle.maxWidth = 1150
         end if
         if m.liveIndicator <> invalid
-            m.liveIndicator.translation = [1460, 10]
+            m.liveIndicator.translation = [1630, 48]
         end if
     end if
 
@@ -609,36 +609,32 @@ sub focusButton(buttonIndex)
     clearAllButtonFocus()
 
     if m.isLiveStream
-        ' Adjust button indices for live streams (back, play/pause, chat, settings)
-        if buttonIndex = 0 ' Back
+        ' Adjust button indices for live streams (0=play/pause, 1=chat, 2=settings)
+        if buttonIndex = 0 ' Play/Pause
             m.currentFocusedButton = 0
-            m.backFocus.visible = true
-        else if buttonIndex = 1 or buttonIndex = 2 or buttonIndex = 3 or buttonIndex = 4 ' Any middle button -> play/pause
-            m.currentFocusedButton = 1
             m.playPauseFocus.visible = true
-        else if buttonIndex = 5 ' Chat
-            m.currentFocusedButton = 2
+        else if buttonIndex = 1 ' Chat
+            m.currentFocusedButton = 1
             m.chatFocus.visible = true
-        else if buttonIndex = 6 ' Settings
-            m.currentFocusedButton = 3
+        else if buttonIndex = 2 ' Settings
+            m.currentFocusedButton = 2
             if m.settingsFocus <> invalid then m.settingsFocus.visible = true
         end if
     else
-        ' Normal button handling for VOD/clips
+        ' Normal button handling for VOD/clips:
+        ' 0=rewind(-10s), 1=play/pause, 2=fastforward(+10s), 3=timetravel, 4=chat, 5=settings
         m.currentFocusedButton = buttonIndex
-        if buttonIndex = 0 ' Back
-            m.backFocus.visible = true
-        else if buttonIndex = 1 ' Time Travel
-            m.timeTravelFocus.visible = true
-        else if buttonIndex = 2 ' Rewind
+        if buttonIndex = 0 ' Rewind (-10s)
             m.rewindFocus.visible = true
-        else if buttonIndex = 3 ' Play/Pause
+        else if buttonIndex = 1 ' Play/Pause
             m.playPauseFocus.visible = true
-        else if buttonIndex = 4 ' Fast Forward
+        else if buttonIndex = 2 ' Fast Forward (+10s)
             m.fastForwardFocus.visible = true
-        else if buttonIndex = 5 ' Chat
+        else if buttonIndex = 3 ' Time Travel
+            m.timeTravelFocus.visible = true
+        else if buttonIndex = 4 ' Chat
             m.chatFocus.visible = true
-        else if buttonIndex = 6 ' Settings
+        else if buttonIndex = 5 ' Settings
             if m.settingsFocus <> invalid then m.settingsFocus.visible = true
         end if
     end if
@@ -656,43 +652,27 @@ end sub
 
 sub executeButtonAction()
     if m.isLiveStream
-        ' Live stream button actions
-        if m.currentFocusedButton = 0 ' Back
-            ? getLogTimestamp(); " [CustomVideo] Back button pressed - attempting to exit"
-            m.top.back = true
-            if m.top.getParent() <> invalid
-                m.top.getParent().back = true
-            end if
-            hideOverlay()
-            m.top.control = "stop"
-        else if m.currentFocusedButton = 1 ' Play/Pause
+        ' Live stream button actions (0=play/pause, 1=chat, 2=settings)
+        if m.currentFocusedButton = 0 ' Play/Pause
             togglePlayPause()
-        else if m.currentFocusedButton = 2 ' Chat
+        else if m.currentFocusedButton = 1 ' Chat
             m.top.toggleChat = true
-        else if m.currentFocusedButton = 3 ' Settings
+        else if m.currentFocusedButton = 2 ' Settings
             showQualityDialog()
         end if
     else
-        ' VOD/Clips button actions
-        if m.currentFocusedButton = 0 ' Back
-            ? getLogTimestamp(); " [CustomVideo] Back button pressed - attempting to exit"
-            m.top.back = true
-            if m.top.getParent() <> invalid
-                m.top.getParent().back = true
-            end if
-            hideOverlay()
-            m.top.control = "stop"
-        else if m.currentFocusedButton = 1 ' Time Travel
-            openTimeTravelDialog()
-        else if m.currentFocusedButton = 2 ' Rewind
+        ' VOD/Clips button actions (0=rewind, 1=play/pause, 2=fastforward, 3=timetravel, 4=chat, 5=settings)
+        if m.currentFocusedButton = 0 ' Rewind
             seekRelative(-10)
-        else if m.currentFocusedButton = 3 ' Play/Pause
+        else if m.currentFocusedButton = 1 ' Play/Pause
             togglePlayPause()
-        else if m.currentFocusedButton = 4 ' Fast Forward
+        else if m.currentFocusedButton = 2 ' Fast Forward
             seekRelative(10)
-        else if m.currentFocusedButton = 5 ' Chat
+        else if m.currentFocusedButton = 3 ' Time Travel
+            openTimeTravelDialog()
+        else if m.currentFocusedButton = 4 ' Chat
             m.top.toggleChat = true
-        else if m.currentFocusedButton = 6 ' Settings
+        else if m.currentFocusedButton = 5 ' Settings
             showQualityDialog()
         end if
     end if
@@ -1118,35 +1098,35 @@ function handleMainKeys(key) as boolean
 
     if key = "left"
         if m.isLiveStream
-            ' Live stream navigation: back(0) -> play/pause(1) -> chat(2) -> settings(3)
+            ' Live stream navigation: play/pause(0) -> chat(1) -> settings(2)
             if m.currentFocusedButton > 0
                 focusButton(m.currentFocusedButton - 1)
             else
-                focusButton(3) ' Wrap to settings
+                focusButton(2) ' Wrap to settings
             end if
         else
-            ' Normal navigation: back(0) .. settings(6)
+            ' Normal navigation: rewind(0) -> play/pause(1) -> fastforward(2) -> timetravel(3) -> chat(4) -> settings(5)
             if m.currentFocusedButton > 0
                 focusButton(m.currentFocusedButton - 1)
             else
-                focusButton(6) ' Wrap to settings button
+                focusButton(5) ' Wrap to settings button
             end if
         end if
         return true
     else if key = "right"
         if m.isLiveStream
-            ' Live stream navigation: back(0) -> play/pause(1) -> chat(2) -> settings(3)
-            if m.currentFocusedButton < 3
+            ' Live stream navigation: play/pause(0) -> chat(1) -> settings(2)
+            if m.currentFocusedButton < 2
                 focusButton(m.currentFocusedButton + 1)
             else
-                focusButton(0) ' Wrap to back
+                focusButton(0) ' Wrap to play/pause
             end if
         else
-            ' Normal navigation
-            if m.currentFocusedButton < 6
+            ' Normal navigation: rewind(0) .. settings(5)
+            if m.currentFocusedButton < 5
                 focusButton(m.currentFocusedButton + 1)
             else
-                focusButton(0) ' Wrap to back button
+                focusButton(0) ' Wrap to rewind button
             end if
         end if
         return true

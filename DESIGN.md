@@ -88,48 +88,44 @@ Para nombres de usuario en el chat:
 
 ---
 
-## 6. Arquitectura del Reproductor (Modern Floating HUD)
+## 6. Arquitectura del Reproductor (Modern Floating HUD - Punto Medio LG + Apple TV)
 
-El reproductor adopta una arquitectura de HUD flotante de dos zonas superpuestas sobre el vídeo mediante degradados verticales cinematográficos (*scrims*):
+El reproductor adopta una arquitectura inspirada en lo mejor de la app oficial de Twitch para **LG TV** (anclaje de metadatos inferior y seekbar corrida) y **Apple TV** (cápsulas estilizadas tipo tvOS y ergonomía de 10 pies sin obstrucción central):
 
-### A. Zona Superior (Top Floating Header)
-- **Coordenadas:** `translation: [60, 48]`, altura `100px`.
-- **Top Scrim:** Gradiente `1920 × 200px` de `0x000000D0` a `0x00000000`.
-- **Avatar:** `CirclePoster` `48 × 48px` con contorno `0x26262CFF`.
-- **Streamer Name:** `Archivo-Bold.otf` 22px (`textPrimary`).
-- **Stream/VOD Title:** `Archivo-Regular.otf` 16px (`textSecondary`), `maxWidth: 1100px`.
-- **Badges de Estado:**
-  - `[ EN VIVO ]  01:26:31`: Cápsula `0x18181BE6` de 32px de altura con texto en `accentLive` y `textPrimary`.
-  - `[ 1080p60 ]`: Pastilla `0x1F1F23CC` de 24px de altura con la calidad activa.
+### A. Zona Superior (Minimal Status)
+- **Coordenadas:** `translation: [0, 48]`. La zona superior se mantiene 100% limpia del título/streamer para permitir máxima visibilidad del contenido.
+- **Top Scrim:** Gradiente sutil `1920 × 180px` (`pkg:/images/scrim_top.png`).
+- **Badges de Estado (Esquina Superior Derecha):**
+  - `[ LIVE | 01:26:31 ]`: Cápsula `0x18181BE6` de 36px de altura con badge rojo `0xEB0400FF` y uptime dinámico en directos.
 
-### B. Zona Inferior (Bottom Floating Controls & Scrubber)
-- **Coordenadas:** `translation: [60, 880]`, altura `150px`.
-- **Bottom Scrim:** Gradiente `1920 × 240px` de `0x00000000` a `0x000000E6`.
+### B. Barra de Progreso y Tiempo (LG TV Scrub Bar)
+- **Coordenadas:** `translation: [70, 835]`.
+- **Bottom Scrim:** Gradiente cinematográfico `1920 × 340px` (`pkg:/images/scrim_bottom.png`) a partir de Y=740.
 - **Seekbar:**
-  - Base: `1800 × 6px`, color `0x3A3A3DFF`.
-  - Buffer: `0x53535FFF`.
-  - Progreso: `0x9146FFFF`.
-  - Tramos silenciados (VOD): Capa superior con `0xFF3860D0` (dual-blend: coral en tramo no visto, rosa neón en tramo reproducido).
-  - Scrubber Dot: `18 × 18px` circular con halo `focusRing`.
+  - Ancho completo: `1780 × 8px` (base `0x3A3A3DFF`, buffer `0x53535FFF`, progreso Twitch Purple `0x9146FFFF`).
+  - Tramos silenciados (VOD): Dual-blend segmentado (coral `#BA4D5E` no visto / rosa neón `#EA428D` visto).
+  - Progress Dot: `22 × 22px` con núcleo blanco de `10 × 10px`.
 - **Timestamps:**
-  - Izquierda: `timeProgress` (`01:23:45`) en `Archivo-Bold` 16px.
-  - Derecha: Tiempo restante (`-00:45:12`) o duración en `Archivo-Regular` 16px.
-- **Fila de Acciones en Cápsulas (Pills):**
-  - Botones rediseñados como cápsulas estilizadas con esquinas redondeadas:
-    - `[ ← ]`: Volver (`52 × 44px`).
-    - `[ ⏱ ]`: Time Travel (`52 × 44px`).
-    - `[ -10 ]`: Retroceso rápido (`64 × 44px`).
-    - `[ ▶ / ⏸ ]`: Botón Hero central (`72 × 48px`).
-    - `[ +10 ]`: Avance rápido (`64 × 44px`).
-    - `[ 💬 ]`: Modo de Chat (`64 × 44px`).
-    - `[ ⚙ ]`: Menú de Ajustes / Calidad rápida (`52 × 44px`).
-- **Micro-interacciones de Foco:**
-  - Botón activo: fondo `focusRing` (`0x9146FFFF`) con icono blanco y escalado sutil.
-  - Botón inactivo: fondo `0x404040AA` con icono teñido a `0xADADB8FF` vía `blendColor`.
+  - Izquierda: `timeProgress` (`00:48`) en `Archivo-Bold` 18px blanco (`0xFFFFFFFF`).
+  - Derecha: `timeDuration` (`02:15:33`) en `Archivo-Bold` 18px gris (`0xADADB8FF`).
 
-### C. Responsividad con Chat Sidebar
-- Al abrirse el chat lateral (`400px` – `576px`):
-  - El ancho de la seekbar se contrae automáticamente a `1800 - chatWidth`.
-  - Los botones inferiores se recentran dentro del área visible: `x = (1800 - chatWidth) / 2`.
-  - El título superior ajusta su `maxWidth` a `1100 - chatWidth` evitando cualquier colisión.
+### C. Fila Inferior (LG TV Metadata + Apple TV Pills)
+Directamente debajo de la seekbar (Y ~ 890px), la fila inferior se divide en dos bloques equilibrados:
+1. **Bloque Izquierdo (Metadatos del Canal):**
+   - **Avatar:** `CirclePoster` `60 × 60px` (`translation: [0, 0]`).
+   - **Streamer Name:** `Archivo-Bold.otf` 22px blanco (`translation: [76, 4]`).
+   - **Stream/VOD Title:** `EmojiLabel` con `Archivo-Regular.otf` 16px gris (`0xADADB8FF`, `translation: [76, 34]`, soporte completo de emojis y truncado elíptico).
+2. **Bloque Derecho (Cápsulas de Acción):**
+   - **VOD:**
+     - Transporte: `[ ↺ -10s ]` (`76 × 56px`), `[ ▶ / ⏸ Hero ]` (`92 × 64px`, foco inicial por defecto), `[ ↻ +10s ]` (`76 × 56px`).
+     - Utilidades: `[ ⏱ Time Travel ]` (`64 × 56px`), `[ 💬 Modo Chat ]` (`72 × 56px`), `[ ⚙ Ajustes / Calidad ]` (`64 × 56px`).
+   - **Directos (Live):**
+     - `[ ▶ / ⏸ Hero ]` (`92 × 64px`), `[ 💬 Modo Chat ]` (`72 × 56px`), `[ ⚙ Ajustes / Calidad ]` (`64 × 56px`).
+
+### D. Responsividad con Chat Sidebar (Drawer Derecho ~26%)
+- Al abrirse el chat lateral (`495px` de ancho en 1080p, equivalente a LG TV):
+  - El ancho de la seekbar se ajusta de 1780px a `videoWidth - 115px` (~1310px).
+  - El cluster de botones se desplaza a la derecha del área de video visible (`translation: [videoWidth - 45 - buttonsW, 890]`).
+  - `maxWidth` del título se recalcula dinámicamente (`buttonsX - 176px`) evitando cualquier solapamiento.
+  - El badge `LIVE` se alinea a `[videoWidth - 270, 48]`.
 

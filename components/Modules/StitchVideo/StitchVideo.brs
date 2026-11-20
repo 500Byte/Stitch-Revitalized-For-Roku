@@ -46,7 +46,7 @@ sub init()
     m.qualityDialog = invalid
 
     ' State variables
-    m.currentFocusedButton = 2 ' 0=back, 1=chat, 2=play/pause, 3=quality
+    m.currentFocusedButton = 0 ' 0=play/pause, 1=chat, 2=quality
     m.isOverlayVisible = false
     m.currentPositionSeconds = 0
     m.isLiveStream = true ' StitchVideo is always for live streams
@@ -362,40 +362,42 @@ sub issueLiveEdgeSeek(reason as string)
 end sub
 
 sub onChatVisibilityChange()
-    chatW = 400
+    chatW = 495
     if m.global.constants <> invalid and m.global.constants.chatWidth <> invalid and m.global.constants.chatWidth > 0
         chatW = m.global.constants.chatWidth
     end if
 
+    ' Adjust layout based on chat visibility (Punto Medio LG + Apple TV)
     if m.top.chatIsVisible
-        targetWidth = 1800 - chatW
-        if targetWidth < 1200 then targetWidth = 1200
-        m.progressBarBase.width = targetWidth
-        m.progressBarProgress.width = targetWidth
+        videoW = 1920 - chatW
+        if videoW < 1200 then videoW = 1200
+        seekW = videoW - 115
+        m.progressBarBase.width = seekW
+        m.progressBarProgress.width = seekW
 
-        buttonsW = 346
-        newButtonsX = Int((1920 - chatW - buttonsW) / 2)
-        if newButtonsX < 60 then newButtonsX = 60
+        buttonsW = 258
+        buttonsX = videoW - 45 - buttonsW
+        if buttonsX < 900 then buttonsX = 900
         if m.actionControlsGroup <> invalid
-            m.actionControlsGroup.translation = [newButtonsX, 935]
+            m.actionControlsGroup.translation = [buttonsX, 890]
         end if
         if m.videoTitle <> invalid
-            m.videoTitle.maxWidth = targetWidth - 200
+            m.videoTitle.maxWidth = buttonsX - 70 - 76 - 30
         end if
         if m.liveIndicator <> invalid
-            m.liveIndicator.translation = [1080, 6]
+            m.liveIndicator.translation = [videoW - 270, 48]
         end if
     else
-        m.progressBarBase.width = 1800
-        m.progressBarProgress.width = 1800
+        m.progressBarBase.width = 1780
+        m.progressBarProgress.width = 1780
         if m.actionControlsGroup <> invalid
-            m.actionControlsGroup.translation = [787, 935]
+            m.actionControlsGroup.translation = [1592, 890]
         end if
         if m.videoTitle <> invalid
-            m.videoTitle.maxWidth = 1100
+            m.videoTitle.maxWidth = 1400
         end if
         if m.liveIndicator <> invalid
-            m.liveIndicator.translation = [1460, 10]
+            m.liveIndicator.translation = [1630, 48]
         end if
     end if
     updateProgressBar()
@@ -575,13 +577,12 @@ sub focusButton(buttonIndex)
     clearAllButtonFocus()
     m.currentFocusedButton = buttonIndex
 
-    if buttonIndex = 0 ' Back
-        m.backFocus.visible = true
+    ' Live stream buttons: 0=play/pause, 1=chat, 2=quality
+    if buttonIndex = 0 ' Play/Pause
+        m.playPauseFocus.visible = true
     else if buttonIndex = 1 ' Chat
         m.chatFocus.visible = true
-    else if buttonIndex = 2 ' Play/Pause
-        m.playPauseFocus.visible = true
-    else if buttonIndex = 3 ' Quality
+    else if buttonIndex = 2 ' Quality
         m.qualityFocus.visible = true
     end if
 end sub
@@ -594,19 +595,12 @@ sub clearAllButtonFocus()
 end sub
 
 sub executeButtonAction()
-    if m.currentFocusedButton = 0 ' Back
-        ' ? "[StitchVideo] Back button pressed - attempting to exit"
-        m.top.backPressed = true
-        if m.top.getParent() <> invalid
-            m.top.getParent().backPressed = true
-        end if
-        hideOverlay()
-        m.top.control = "stop"
+    ' Live stream button actions (0=play/pause, 1=chat, 2=quality)
+    if m.currentFocusedButton = 0 ' Play/Pause
+        togglePlayPause()
     else if m.currentFocusedButton = 1 ' Chat
         m.top.toggleChat = true
-    else if m.currentFocusedButton = 2 ' Play/Pause
-        togglePlayPause()
-    else if m.currentFocusedButton = 3 ' Quality
+    else if m.currentFocusedButton = 2 ' Quality
         showQualityDialog()
     end if
 end sub
@@ -782,19 +776,19 @@ function handleMainKeys(key) as boolean
     end if
 
     if key = "left"
-        ' Live stream navigation: back(0) -> chat(1) -> play/pause(2) -> quality(3)
+        ' Live stream navigation: play/pause(0) -> chat(1) -> quality(2)
         if m.currentFocusedButton > 0
             focusButton(m.currentFocusedButton - 1)
         else
-            focusButton(3) ' Wrap to quality
+            focusButton(2) ' Wrap to quality
         end if
         return true
     else if key = "right"
-        ' Live stream navigation: back(0) -> chat(1) -> play/pause(2) -> quality(3)
-        if m.currentFocusedButton < 3
+        ' Live stream navigation: play/pause(0) -> chat(1) -> quality(2)
+        if m.currentFocusedButton < 2
             focusButton(m.currentFocusedButton + 1)
         else
-            focusButton(0) ' Wrap to back
+            focusButton(0) ' Wrap to play/pause
         end if
         return true
     else if key = "down" or key = "back"
