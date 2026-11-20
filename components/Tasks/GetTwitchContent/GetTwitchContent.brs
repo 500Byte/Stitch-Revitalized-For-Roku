@@ -378,7 +378,7 @@ sub main()
             content.live = true
         end if
 
-        userQualityPreference = get_user_setting("playback.video.quality", "auto")
+        userQualityPreference = get_user_setting("playback.video.quality", "highest")
 
         selectedMetadata = invalid
         if userQualityPreference = "highest" and metadata.Count() > 1
