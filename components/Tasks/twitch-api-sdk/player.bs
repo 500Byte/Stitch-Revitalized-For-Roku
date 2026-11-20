@@ -54,3 +54,30 @@ function getChannelInterstitialQuery() as object
     m.top.control = TaskControl.STOP
     return invalid
 end function
+
+sub getVodMutedSegmentsQuery()
+    vodId = ""
+    if m.top.request <> invalid and m.top.request.id <> invalid
+        vodId = m.top.request.id
+    end if
+    req = HttpRequest({
+        url: "https://gql.twitch.tv/gql",
+        headers: {
+            "Client-ID": "kimne78kx3ncx6brgo4mv6wki5h1ko",
+            "Content-Type": "application/json"
+        },
+        method: "POST",
+        data: [{
+            "operationName": "VideoPlayer_VODSeekbar",
+            "variables": { "includePrivate": false, "vodID": vodId },
+            "extensions": { "persistedQuery": { "version": 1, "sha256Hash": "c67d32eba8f1c93b02e7efa6a278be46009e390ed5195c02dd0621e4c7ca14ac" } }
+        }]
+    })
+    rsp = ParseJSON(req.send())
+    if rsp <> invalid and rsp.count() > 0 and rsp[0].data <> invalid and rsp[0].data.video <> invalid
+        m.top.response = rsp[0].data.video
+    else
+        m.top.response = { "response": invalid }
+    end if
+    m.top.control = TaskControl.STOP
+end sub

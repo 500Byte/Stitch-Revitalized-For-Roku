@@ -11,9 +11,15 @@ sub init()
     m.progressBarBase = m.top.findNode("progressBarBase")
     m.progressBarProgress = m.top.findNode("progressBarProgress")
     m.progressBarBuffer = m.top.findNode("progressBarBuffer")
+    m.mutedSegmentsGroup = m.top.findNode("mutedSegmentsGroup")
     m.progressDot = m.top.findNode("progressDot")
     m.timeProgress = m.top.findNode("timeProgress")
     m.timeDuration = m.top.findNode("timeDuration")
+
+    ' Toast elements
+    m.chatModeToast = m.top.findNode("chatModeToast")
+    m.muteSkipToast = m.top.findNode("muteSkipToast")
+    m.mutedSegments = invalid
 
     ' Control buttons
     m.playPauseGroup = m.top.findNode("playPauseGroup")
@@ -101,6 +107,7 @@ sub init()
     m.top.observeField("position", "onPositionChange")
     m.top.observeField("state", "onVideoStateChange")
     m.top.observeField("chatIsVisible", "onChatVisibilityChange")
+    m.top.observeField("streamLayoutMode", "onStreamLayoutModeChange")
     m.top.observeField("duration", "onDurationChange")
     m.top.observeField("bufferingStatus", "onBufferingStatusChange")
     m.top.observeField("video_type", "onVideoTypeChange")
@@ -195,6 +202,32 @@ sub onPositionChange()
         updateProgressBar()
     end if
 
+    ' Auto-skip muted audio segments if enabled (like Trubbel / SkipMute)
+    if m.mutedSegments <> invalid and not m.isSeekMode and get_user_setting("AutoSkipMuted", "false") = "true"
+        currPos = m.currentPositionSeconds
+        for each seg in m.mutedSegments
+            if seg.offset <> invalid and seg.duration <> invalid
+                if currPos >= seg.offset and currPos < (seg.offset + seg.duration - 1)
+                    target = seg.offset + seg.duration
+                    m.top.seek = target
+                    if m.muteSkipToast <> invalid
+                        m.muteSkipToast.text = "Saltando audio silenciado..."
+                        m.muteSkipToast.visible = true
+                        if m.muteToastTimer = invalid
+                            m.muteToastTimer = CreateObject("roSGNode", "Timer")
+                            m.muteToastTimer.duration = 3
+                            m.muteToastTimer.repeat = false
+                            m.muteToastTimer.observeField("fire", "hideMuteToast")
+                        end if
+                        m.muteToastTimer.control = "stop"
+                        m.muteToastTimer.control = "start"
+                    end if
+                    exit for
+                end if
+            end if
+        end for
+    end if
+
     ' Auto-save bookmark every 20 seconds (not for live streams)
     if not m.isLiveStream
         ' Position reads 0 at start and when the player resets on exit; saving it
@@ -254,6 +287,7 @@ sub onChatVisibilityChange()
 
     ' Update all progress bar elements to match new width
     updateProgressBar()
+    renderMutedSegments()
 
     ' Update buffer bar if buffering status is available
     if m.top.bufferingStatus <> invalid
@@ -267,8 +301,82 @@ end sub
 
 sub onDurationChange()
     updateProgressBar()
-    ' Update UI when duration is available
     updateUIForVideoType()
+    if m.top.video_type = "VOD" and m.top.video_id <> invalid and m.top.video_id <> "" and m.mutedSegments = invalid
+        m.mutedTask = createApiTask("getVodMutedSegmentsQuery", "onMutedSegmentsResponse", { id: m.top.video_id })
+    else if m.mutedSegments <> invalid
+        renderMutedSegments()
+    end if
+end sub
+
+sub onMutedSegmentsResponse()
+    if m.mutedTask <> invalid and m.mutedTask.response <> invalid
+        res = m.mutedTask.response
+        if res.muteInfo <> invalid and res.muteInfo.mutedSegmentConnection <> invalid
+            nodes = res.muteInfo.mutedSegmentConnection.nodes
+            if nodes <> invalid
+                m.mutedSegments = nodes
+                renderMutedSegments()
+            end if
+        end if
+    end if
+    m.mutedTask = destroyTask(m.mutedTask, "response")
+end sub
+
+sub renderMutedSegments()
+    if m.mutedSegmentsGroup = invalid or m.mutedSegments = invalid or m.top.duration <= 0 then return
+    m.mutedSegmentsGroup.removeChildrenIndex(m.mutedSegmentsGroup.getChildCount(), 0)
+
+    baseWidth = m.progressBarBase.width
+    totalDuration = m.top.duration
+
+    for each seg in m.mutedSegments
+        if seg.offset <> invalid and seg.duration <> invalid
+            startX = (seg.offset / totalDuration) * baseWidth
+            segW = (seg.duration / totalDuration) * baseWidth
+            if segW < 3 then segW = 3 ' Minimum 3px visible segment
+
+            rect = createObject("roSGNode", "Rectangle")
+            rect.width = segW
+            rect.height = 4
+            rect.color = "0xE91E63FF" ' Twitch muted pink/red color
+            rect.translation = [startX, 0]
+            m.mutedSegmentsGroup.appendChild(rect)
+        end if
+    end for
+end sub
+
+sub onStreamLayoutModeChange()
+    mode = m.top.streamLayoutMode
+    text = ""
+    if mode = 1
+        text = "Chat: Lateral"
+    else if mode = 2
+        text = "Chat: Superpuesto"
+    else if mode = 0
+        text = "Chat: Oculto"
+    end if
+
+    if text <> "" and m.chatModeToast <> invalid
+        m.chatModeToast.text = text
+        m.chatModeToast.visible = true
+        if m.chatToastTimer = invalid
+            m.chatToastTimer = CreateObject("roSGNode", "Timer")
+            m.chatToastTimer.duration = 2
+            m.chatToastTimer.repeat = false
+            m.chatToastTimer.observeField("fire", "hideChatToast")
+        end if
+        m.chatToastTimer.control = "stop"
+        m.chatToastTimer.control = "start"
+    end if
+end sub
+
+sub hideChatToast()
+    if m.chatModeToast <> invalid then m.chatModeToast.visible = false
+end sub
+
+sub hideMuteToast()
+    if m.muteSkipToast <> invalid then m.muteSkipToast.visible = false
 end sub
 
 sub onBufferingStatusChange()
@@ -937,6 +1045,15 @@ sub onDestroy()
         m.messageTimer.control = "stop"
         m.messageTimer.unobserveField("fire")
     end if
+    if m.chatToastTimer <> invalid
+        m.chatToastTimer.control = "stop"
+        m.chatToastTimer.unobserveField("fire")
+    end if
+    if m.muteToastTimer <> invalid
+        m.muteToastTimer.control = "stop"
+        m.muteToastTimer.unobserveField("fire")
+    end if
+    m.mutedTask = destroyTask(m.mutedTask, "response")
     m.top.unobserveField("position")
     m.top.unobserveField("state")
     m.top.unobserveField("chatIsVisible")

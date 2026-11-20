@@ -221,6 +221,11 @@ sub playContent(isRecovery = false as boolean)
         m.video = m.top.CreateChild("CustomVideo")
     end if
 
+    ' Ensure chat is drawn on top of the video surface so overlay mode is visible
+    if m.chatWindow <> invalid
+        m.top.appendChild(m.chatWindow)
+    end if
+
     httpAgent = CreateObject("roHttpAgent")
     httpAgent.setCertificatesFile("common:/certs/ca-bundle.crt")
     httpAgent.InitClientCertificates()

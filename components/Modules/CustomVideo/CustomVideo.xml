@@ -23,6 +23,7 @@
     <script type="text/brightscript" uri="CustomVideo.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/config.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/misc.brs" />
+    <script type="text/brightscript" uri="pkg:/source/utils/taskFactory.brs" />
     <children>
         <!-- Modern Time Travel Dialog -->
         <Group id="timeTravelDialog" visible="false" translation="[660,360]">
@@ -180,6 +181,7 @@
                 <!-- Progress Bar -->
                 <Rectangle id="progressBarBase" color="0x404040FF" width="1800" height="4"  translation="[0,65]" />
                 <Rectangle id="progressBarBuffer" color="0x606060FF" width="0" height="4"  translation="[0,65]" />
+                <Group id="mutedSegmentsGroup" translation="[0,65]" />
                 <Rectangle id="progressBarProgress" color="0x9146FFFF" width="0" height="4"  translation="[0,65]" />
                 
                 <!-- Progress Dot -->
@@ -189,6 +191,10 @@
                 </Group>
             </Group>
             
+            <!-- Toast notifications for chat mode & mute skip -->
+            <SimpleLabel id="chatModeToast" translation="[960, 50]" text="" color="0x9146FFFF" fontSize="18" fontUri="pkg:/fonts/Archivo-Bold.otf" visible="false" />
+            <SimpleLabel id="muteSkipToast" translation="[860, 50]" text="" color="0xE91E63FF" fontSize="18" fontUri="pkg:/fonts/Archivo-Bold.otf" visible="false" />
+
             <!-- Control Buttons -->
             <Group translation="[0,95]">
                 <!-- Back Button (far left) -->

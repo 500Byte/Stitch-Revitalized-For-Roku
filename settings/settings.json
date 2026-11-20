@@ -101,6 +101,13 @@
         "default": "true"
     },
     {
+        "title": "Auto-Skip Muted Audio Segments",
+        "description": "Automatically jump past copyright-muted audio sections in VODs (FrankerFaceZ / Trubbel style).",
+        "settingName": "AutoSkipMuted",
+        "type": "bool",
+        "default": "false"
+    },
+    {
         "title": "Offline Follow Sorting",
         "description": "Determines how the offline channels on the following page are sorted.",
         "settingName": "FollowPageSorting",
