@@ -59,6 +59,7 @@ sub stopJobs()
     stopChatJob()
     if m.EmoteJob <> invalid
         m.EmoteJob.control = "stop"
+        m.top.removeChild(m.EmoteJob)
         m.EmoteJob = invalid
     end if
 end sub
@@ -88,18 +89,32 @@ sub onVideoPositionChange()
     end if
 end sub
 
+sub startEmoteJob(channelId as dynamic, channelLogin as dynamic)
+    cId = ""
+    if channelId <> invalid then cId = channelId.toStr()
+    cLogin = ""
+    if channelLogin <> invalid then cLogin = channelLogin.toStr()
+
+    if m.EmoteJob <> invalid
+        m.EmoteJob.control = "stop"
+        m.top.removeChild(m.EmoteJob)
+        m.EmoteJob = invalid
+    end if
+
+    m.EmoteJob = createObject("roSGNode", "EmoteJob")
+    m.EmoteJob.channel_id = cId
+    m.EmoteJob.channel = cLogin
+    m.top.appendChild(m.EmoteJob)
+    m.EmoteJob.control = "run"
+end sub
+
 sub onVodBroadcasterIdChange()
     if m.chat <> invalid and m.chat.broadcasterId <> invalid and m.chat.broadcasterId <> ""
         m.top.channel_id = m.chat.broadcasterId
         if m.chat.broadcasterLogin <> invalid and m.chat.broadcasterLogin <> ""
             m.top.channel = m.chat.broadcasterLogin
         end if
-        if m.EmoteJob <> invalid
-            m.EmoteJob.channel_id = m.chat.broadcasterId
-            m.EmoteJob.channel = m.chat.broadcasterLogin
-            m.EmoteJob.control = "stop"
-            m.EmoteJob.control = "run"
-        end if
+        startEmoteJob(m.top.channel_id, m.top.channel)
     end if
 end sub
 
@@ -120,10 +135,7 @@ sub onEnterChannel()
         m.chat.control = "stop"
         m.chat.control = "run"
     end if
-    m.EmoteJob = m.top.findnode("EmoteJob")
-    m.EmoteJob.channel_id = m.top.channel_id
-    m.EmoteJob.channel = m.top.channel
-    m.EmoteJob.control = "run"
+    startEmoteJob(m.top.channel_id, m.top.channel)
 end sub
 
 function extractMessage(section) as object
