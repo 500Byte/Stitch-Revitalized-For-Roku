@@ -365,6 +365,11 @@ sub playContent(isRecovery = false as boolean)
         if contentNodeToPlay.contentTitle <> invalid
             m.video.videoTitle = contentNodeToPlay.contentTitle
         end if
+        if contentNodeToPlay.createdAt <> invalid and contentNodeToPlay.createdAt <> ""
+            m.video.streamCreatedAt = contentNodeToPlay.createdAt
+        else if m.top.contentRequested?.createdAt <> invalid and m.top.contentRequested.createdAt <> ""
+            m.video.streamCreatedAt = m.top.contentRequested.createdAt
+        end if
 
         m.video.visible = false ' Make visible after PlayerTask starts if needed
 

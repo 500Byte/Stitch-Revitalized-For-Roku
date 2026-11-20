@@ -73,7 +73,7 @@ sub main()
         end if
         if m.top.contentRequested.contentType = "LIVE"
             rsp = TwitchGraphQLRequest({
-                query: "query StreamPlayer_Query($login: String!, $playerType: String!, $platform: String!, $skipPlayToken: Boolean!) { ...StreamPlayer_token } fragment StreamPlayer_token on Query { user(login: $login) { login stream @skip(if: $skipPlayToken) { playbackAccessToken(params: {platform: $platform, playerType: $playerType}) { signature value } id __typename } id __typename } }",
+                query: "query StreamPlayer_Query($login: String!, $playerType: String!, $platform: String!, $skipPlayToken: Boolean!) { ...StreamPlayer_token } fragment StreamPlayer_token on Query { user(login: $login) { login stream @skip(if: $skipPlayToken) { createdAt playbackAccessToken(params: {platform: $platform, playerType: $playerType}) { signature value } id __typename } id __typename } }",
                 variables: {
                     "login": m.top.contentRequested.streamerLogin,
                     "platform": "web_tv",
@@ -81,6 +81,9 @@ sub main()
                     "skipPlayToken": false
                 }
             })
+            if rsp?.data?.user?.stream?.createdAt <> invalid
+                m.streamCreatedAt = rsp.data.user.stream.createdAt
+            end if
         end if
 
         usherUrl = ""
@@ -376,6 +379,9 @@ sub main()
         ' Set live stream properties
         if m.top.contentRequested.contentType = "LIVE"
             content.live = true
+            if m.streamCreatedAt <> invalid and m.streamCreatedAt <> ""
+                content.createdAt = m.streamCreatedAt
+            end if
         end if
 
         userQualityPreference = get_user_setting("playback.video.quality", "highest")

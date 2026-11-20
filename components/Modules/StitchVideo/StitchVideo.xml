@@ -19,6 +19,7 @@
         <field id="currentProgressBarState" type="Integer" value="1" />
         <field id="video_id" type="string" />
         <field id="video_type" type="string" />
+        <field id="streamCreatedAt" type="string" />
         <field id="qualityOptions" type="array" />
         <field id="selectedQuality" type="string" value="" />
         <!-- Set to roDateTime.AsSeconds() right before issuing an app-initiated
@@ -99,8 +100,8 @@
                 </EmojiLabel>
             </Group>
             
-            <!-- Live Indicator & Uptime Badge (Bottom Left - only visible with overlay) -->
-            <Group id="liveIndicator" translation="[60,100]">
+            <!-- Live Indicator & Uptime Badge (Top Right of overlay) -->
+            <Group id="liveIndicator" translation="[1620,15]">
                 <Rectangle color="0xEB0400FF" width="56" height="24" />
                 <SimpleLabel translation="[10,3]" text="LIVE" color="0xFFFFFFFF" fontSize="16" fontUri="pkg:/fonts/Archivo-Bold.otf" />
                 <SimpleLabel id="uptimeLabel" translation="[68,3]" text="" color="0xADADB8FF" fontSize="16" fontUri="pkg:/fonts/Archivo-Bold.otf" visible="false" />

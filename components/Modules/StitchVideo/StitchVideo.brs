@@ -362,8 +362,10 @@ sub onChatVisibilityChange()
             targetWidth = m.top.width - 120
         end if
         m.progressBarBase.width = targetWidth
+        if m.liveIndicator <> invalid then m.liveIndicator.translation = [1180, 15]
     else
         m.progressBarBase.width = 1800
+        if m.liveIndicator <> invalid then m.liveIndicator.translation = [1620, 15]
     end if
     updateProgressBar()
 end sub
@@ -405,9 +407,17 @@ end sub
 
 sub updateUptime()
     if m.uptimeLabel = invalid then return
-    if m.top?.content?.createdAt <> invalid and m.top.content.createdAt <> ""
+
+    createdAtStr = ""
+    if m.top.streamCreatedAt <> invalid and m.top.streamCreatedAt <> ""
+        createdAtStr = m.top.streamCreatedAt
+    else if m.top?.content?.createdAt <> invalid and m.top.content.createdAt <> ""
+        createdAtStr = m.top.content.createdAt
+    end if
+
+    if createdAtStr <> ""
         startDt = createObject("roDateTime")
-        startDt.FromISO8601String(m.top.content.createdAt.toStr())
+        startDt.FromISO8601String(createdAtStr)
         nowSec = createObject("roDateTime").AsSeconds()
         uptimeSec = nowSec - startDt.AsSeconds()
         if uptimeSec > 0
