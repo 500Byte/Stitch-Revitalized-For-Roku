@@ -207,19 +207,18 @@ sub playContent(isRecovery = false as boolean)
     isLiveContent = (m.top.contentRequested.contentType = "LIVE")
     isClipContent = (m.top.contentRequested.contentType = "CLIP")
 
+    quality_options = []
+    if m.top.metadata <> invalid
+        for each quality_option in m.top.metadata
+            quality_options.push(quality_option.qualityID)
+        end for
+    end if
     if isLiveContent
-        quality_options = []
-        if m.top.metadata <> invalid
-            for each quality_option in m.top.metadata
-                quality_options.push(quality_option.qualityID)
-            end for
-        end if
         m.video = m.top.CreateChild("StitchVideo")
-        m.video.qualityOptions = quality_options
-        ' StitchVideo will observe its own selectedQuality field
     else
         m.video = m.top.CreateChild("CustomVideo")
     end if
+    m.video.qualityOptions = quality_options
 
     ' Ensure chat is drawn on top of the video surface so overlay mode is visible
     if m.chatWindow <> invalid
@@ -266,9 +265,8 @@ sub playContent(isRecovery = false as boolean)
 
     ' Add observers to the new video node
     m.video.observeField("toggleChat", "onToggleChat")
-    if isLiveContent
-        m.video.observeField("QualityChangeRequestFlag", "onQualityChangeRequested") ' StitchVideo specific
-    else
+    m.video.observeField("QualityChangeRequestFlag", "onQualityChangeRequested")
+    if not isLiveContent
         m.video.observeField("back", "onVideoBack") ' CustomVideo specific
     end if
     m.video.observeField("position", "onPositionChanged")

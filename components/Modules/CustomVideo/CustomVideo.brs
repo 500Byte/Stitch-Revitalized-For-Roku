@@ -41,6 +41,12 @@ sub init()
     m.timeTravelFocus = m.top.findNode("timeTravelFocus")
     m.chatFocus = m.top.findNode("chatFocus")
     m.backFocus = m.top.findNode("backFocus")
+    m.settingsGroup = m.top.findNode("settingsGroup")
+    m.settingsFocus = m.top.findNode("settingsFocus")
+    m.topOverlayGroup = m.top.findNode("topOverlayGroup")
+    m.bottomOverlayGroup = m.top.findNode("bottomOverlayGroup")
+    m.actionControlsGroup = m.top.findNode("actionControlsGroup")
+    m.qualityDialog = invalid
 
     ' Time travel dialog
     m.timeTravelDialog = m.top.findNode("timeTravelDialog")
@@ -261,11 +267,11 @@ end sub
 
 sub onVideoStateChange()
     if m.top.state = "playing"
-        m.controlButton.uri = "pkg:/images/pause.png"
+        m.controlButton.uri = "pkg:/images/icons/pause-hero.png"
         hideLoadingOverlay()
         hideMessage()
     else if m.top.state = "paused"
-        m.controlButton.uri = "pkg:/images/play.png"
+        m.controlButton.uri = "pkg:/images/icons/play-hero.png"
         hideLoadingOverlay()
     else if m.top.state = "buffering"
         showLoadingOverlay()
@@ -295,17 +301,52 @@ sub onVideoStateChange()
 end sub
 
 sub onChatVisibilityChange()
+    chatW = 400
+    if m.global.constants <> invalid and m.global.constants.chatWidth <> invalid and m.global.constants.chatWidth > 0
+        chatW = m.global.constants.chatWidth
+    end if
+
     ' Adjust layout based on chat visibility
     if m.top.chatIsVisible
-        targetWidth = 1480
-        if m.top.width <> invalid and m.top.width > 0
-            targetWidth = m.top.width - 120
-        end if
+        targetWidth = 1800 - chatW
+        if targetWidth < 1200 then targetWidth = 1200
         m.progressBarBase.width = targetWidth
-        m.controlOverlay.translation = [0, 920]
+
+        ' Recenter action buttons in visible video area: (1920 - chatW - buttonsWidth) / 2
+        buttonsW = 492
+        newButtonsX = Int((1920 - chatW - buttonsW) / 2)
+        if newButtonsX < 60 then newButtonsX = 60
+        if m.actionControlsGroup <> invalid
+            m.actionControlsGroup.translation = [newButtonsX, 955]
+        end if
+
+        ' Adjust right timestamp label coordinate
+        if m.timeDuration <> invalid
+            m.timeDuration.translation = [targetWidth - 80, 0]
+        end if
+
+        ' Constrain video title width so it does not overlap with chat
+        if m.videoTitle <> invalid
+            m.videoTitle.maxWidth = targetWidth - 200
+        end if
+
+        if m.liveIndicator <> invalid
+            m.liveIndicator.translation = [1080, 6]
+        end if
     else
         m.progressBarBase.width = 1800
-        m.controlOverlay.translation = [0, 920]
+        if m.actionControlsGroup <> invalid
+            m.actionControlsGroup.translation = [714, 955]
+        end if
+        if m.timeDuration <> invalid
+            m.timeDuration.translation = [1720, 0]
+        end if
+        if m.videoTitle <> invalid
+            m.videoTitle.maxWidth = 1100
+        end if
+        if m.liveIndicator <> invalid
+            m.liveIndicator.translation = [1500, 6]
+        end if
     end if
 
     ' Update all progress bar elements to match new width
@@ -524,16 +565,18 @@ sub updateProgressBar()
         m.progressBarProgress.width = m.progressBarBase.width * progressRatio
 
         ' Clamp the progress dot position within bounds
-        dotX = m.progressBarBase.width * progressRatio - 8
+        dotX = m.progressBarBase.width * progressRatio - 9
         if dotX < 0 then dotX = 0
         if dotX > m.progressBarBase.width then dotX = m.progressBarBase.width
 
-        m.progressDot.translation = [dotX, 60]
+        m.progressDot.translation = [dotX, 18]
         m.progressDot.visible = true
 
-        ' Update time displays
+        ' Update time displays: elapsed on left, remaining (-HH:MM:SS) on right
         m.timeProgress.text = convertToReadableTimeFormat(m.currentPositionSeconds)
-        m.timeDuration.text = convertToReadableTimeFormat(m.top.duration)
+        remSec = m.top.duration - m.currentPositionSeconds
+        if remSec < 0 then remSec = 0
+        m.timeDuration.text = "-" + convertToReadableTimeFormat(remSec)
     end if
 end sub
 
@@ -566,7 +609,7 @@ sub focusButton(buttonIndex)
     clearAllButtonFocus()
 
     if m.isLiveStream
-        ' Adjust button indices for live streams (only back, play/pause, chat available)
+        ' Adjust button indices for live streams (back, play/pause, chat, settings)
         if buttonIndex = 0 ' Back
             m.currentFocusedButton = 0
             m.backFocus.visible = true
@@ -576,6 +619,9 @@ sub focusButton(buttonIndex)
         else if buttonIndex = 5 ' Chat
             m.currentFocusedButton = 2
             m.chatFocus.visible = true
+        else if buttonIndex = 6 ' Settings
+            m.currentFocusedButton = 3
+            if m.settingsFocus <> invalid then m.settingsFocus.visible = true
         end if
     else
         ' Normal button handling for VOD/clips
@@ -592,6 +638,8 @@ sub focusButton(buttonIndex)
             m.fastForwardFocus.visible = true
         else if buttonIndex = 5 ' Chat
             m.chatFocus.visible = true
+        else if buttonIndex = 6 ' Settings
+            if m.settingsFocus <> invalid then m.settingsFocus.visible = true
         end if
     end if
 end sub
@@ -603,6 +651,7 @@ sub clearAllButtonFocus()
     m.timeTravelFocus.visible = false
     m.chatFocus.visible = false
     m.backFocus.visible = false
+    if m.settingsFocus <> invalid then m.settingsFocus.visible = false
 end sub
 
 sub executeButtonAction()
@@ -620,6 +669,8 @@ sub executeButtonAction()
             togglePlayPause()
         else if m.currentFocusedButton = 2 ' Chat
             m.top.toggleChat = true
+        else if m.currentFocusedButton = 3 ' Settings
+            showQualityDialog()
         end if
     else
         ' VOD/Clips button actions
@@ -641,6 +692,8 @@ sub executeButtonAction()
             seekRelative(10)
         else if m.currentFocusedButton = 5 ' Chat
             m.top.toggleChat = true
+        else if m.currentFocusedButton = 6 ' Settings
+            showQualityDialog()
         end if
     end if
 end sub
@@ -1065,32 +1118,32 @@ function handleMainKeys(key) as boolean
 
     if key = "left"
         if m.isLiveStream
-            ' Live stream navigation: back(0) -> play/pause(1) -> chat(2)
+            ' Live stream navigation: back(0) -> play/pause(1) -> chat(2) -> settings(3)
             if m.currentFocusedButton > 0
                 focusButton(m.currentFocusedButton - 1)
             else
-                focusButton(2) ' Wrap to chat
+                focusButton(3) ' Wrap to settings
             end if
         else
-            ' Normal navigation
+            ' Normal navigation: back(0) .. settings(6)
             if m.currentFocusedButton > 0
                 focusButton(m.currentFocusedButton - 1)
             else
-                focusButton(5) ' Wrap to chat button
+                focusButton(6) ' Wrap to settings button
             end if
         end if
         return true
     else if key = "right"
         if m.isLiveStream
-            ' Live stream navigation: back(0) -> play/pause(1) -> chat(2)
-            if m.currentFocusedButton < 2
+            ' Live stream navigation: back(0) -> play/pause(1) -> chat(2) -> settings(3)
+            if m.currentFocusedButton < 3
                 focusButton(m.currentFocusedButton + 1)
             else
                 focusButton(0) ' Wrap to back
             end if
         else
             ' Normal navigation
-            if m.currentFocusedButton < 5
+            if m.currentFocusedButton < 6
                 focusButton(m.currentFocusedButton + 1)
             else
                 focusButton(0) ' Wrap to back button
@@ -1192,5 +1245,54 @@ sub onDestroy()
     m.top.unobserveField("duration")
     m.top.unobserveField("bufferingStatus")
     m.top.unobserveField("video_type")
+    closeQualityDialog()
     m.top.unobserveField("video_id")
+end sub
+
+sub showQualityDialog()
+    scene = m.top.getScene()
+    if scene = invalid or m.qualityDialog <> invalid then return
+    if m.top.qualityOptions <> invalid and m.top.qualityOptions.count() > 0
+        m.fadeAwayTimer.control = "stop"
+
+        dlg = createObject("roSGNode", "StandardMessageDialog")
+        dlg.title = "Calidad de Video"
+        dlg.message = ["Selecciona la calidad:"]
+        buttons = []
+        for each quality in m.top.qualityOptions
+            buttons.push(quality)
+        end for
+        buttons.push("Cancelar")
+        dlg.buttons = buttons
+        dlg.observeFieldScoped("buttonSelected", "onQualityButtonSelect")
+        dlg.observeFieldScoped("wasClosed", "onQualityDialogClosed")
+        m.qualityDialog = dlg
+        scene.dialog = dlg
+    end if
+end sub
+
+sub onQualityButtonSelect()
+    if m.qualityDialog = invalid then return
+    selectedIndex = m.qualityDialog.buttonSelected
+    totalButtons = m.qualityDialog.buttons.count()
+    closeQualityDialog()
+    if selectedIndex >= 0 and selectedIndex < totalButtons - 1 and selectedIndex < m.top.qualityOptions.count()
+        m.top.selectedQuality = m.top.qualityOptions[selectedIndex]
+        m.top.QualityChangeRequest = selectedIndex
+        m.top.QualityChangeRequestFlag = true
+    end if
+end sub
+
+sub onQualityDialogClosed()
+    closeQualityDialog()
+end sub
+
+sub closeQualityDialog()
+    if m.qualityDialog <> invalid
+        m.qualityDialog.close = true
+        m.qualityDialog = invalid
+    end if
+    if m.fadeAwayTimer <> invalid
+        m.fadeAwayTimer.control = "start"
+    end if
 end sub
