@@ -391,26 +391,30 @@ sub onNewCommentObj()
 
         quoteRegex = createObject("roRegex", "[\x{2018}\x{2019}]", "")
         message = quoteRegex.replace(message, "'")
+
+        ' Batch emoteCache additions to avoid costly global field cloning on every emote
+        hasNewEmotes = false
+        emoteCache = m.global.emoteCache
         for each emoticon in emote_set.Items()
             e_start = emoticon.value.starts[0]
             emote_word = Mid(message, (e_start + 1), emoticon.value.length)
-            if not m.global.emoteCache.DoesExist(emote_word)
-                emoteCache = m.global.emoteCache
-                if not emoteCache.DoesExist(emote_word)
-                    emoteCache[emote_word] = "https://static-cdn.jtvnw.net/emoticons/v2/" + emoticon.key + "/static/light/1.0"
-                end if
-                m.global.setField("emoteCache", emoteCache)
+            if not emoteCache.DoesExist(emote_word)
+                emoteCache[emote_word] = "https://static-cdn.jtvnw.net/emoticons/v2/" + emoticon.key + "/static/light/1.0"
+                hasNewEmotes = true
             end if
         end for
 
         if comment?.tags?.emotesList <> invalid
             for each em in comment.tags.emotesList
-                if not m.global.emoteCache.DoesExist(em.word)
-                    emoteCache = m.global.emoteCache
+                if not emoteCache.DoesExist(em.word)
                     emoteCache[em.word] = "https://static-cdn.jtvnw.net/emoticons/v2/" + em.id + "/static/light/1.0"
-                    m.global.setField("emoteCache", emoteCache)
+                    hasNewEmotes = true
                 end if
             end for
+        end if
+
+        if hasNewEmotes
+            m.global.setField("emoteCache", emoteCache)
         end if
 
         if display_name = "" or message = ""
@@ -447,12 +451,17 @@ sub onNewCommentObj()
         y_translation = group.localBoundingRect().height + m.line_gap
         if m.translation + y_translation > m.chatPanel.height
             for each chatmessage in m.chatPanel.getChildren(-1, 0)
-                if (chatmessage.translation[1] + chatmessage.localBoundingRect().height) < 0 ' Wait until it's off the screen to remove it.
+                newY = chatmessage.translation[1] - y_translation
+                if newY < -120 ' Off-screen: remove without expensive localBoundingRect() in loop
                     m.chatPanel.removeChild(chatmessage)
                 else
-                    chatmessage.translation = [chatmessage.translation[0], (chatmessage.translation[1] - y_translation)]
+                    chatmessage.translation = [chatmessage.translation[0], newY]
                 end if
             end for
+            ' Prevent unbounded node accumulation on high-volume chats
+            while m.chatPanel.getChildCount() > 25
+                m.chatPanel.removeChildIndex(0)
+            end while
         else
             m.translation += (y_translation)
         end if

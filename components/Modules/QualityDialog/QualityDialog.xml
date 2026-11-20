@@ -50,7 +50,7 @@
             <Group id="cancelButtonGroup" translation="[36,520]">
                 <Poster id="cancelBg" uri="pkg:/images/capsule.9.png" width="608" height="52" blendColor="0x26262CBB" />
                 <Poster id="cancelFocus" uri="pkg:/images/capsule.9.png" width="608" height="52" blendColor="0x9146FFFF" visible="false" />
-                <SimpleLabel
+                <Label
                     translation="[0,15]"
                     width="608"
                     horizAlign="center"

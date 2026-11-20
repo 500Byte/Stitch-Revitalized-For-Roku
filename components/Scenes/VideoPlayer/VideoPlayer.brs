@@ -118,8 +118,9 @@ sub initChat()
         else
             m.chatLayoutMode = 0
         end if
-        setChatLayoutMode(m.chatLayoutMode)
     end if
+    ' Always sync chat layout mode with active video node
+    setChatLayoutMode(m.chatLayoutMode)
 end sub
 
 sub onQualityChangeRequested()
@@ -379,6 +380,9 @@ sub playContent(isRecovery = false as boolean)
         if isLiveContent or (m.top.contentRequested <> invalid and m.top.contentRequested.contentType = "VOD")
             initChat()
         end if
+        if m.chatLayoutMode <> invalid
+            setChatLayoutMode(m.chatLayoutMode)
+        end if
     end if
 end sub
 
@@ -570,10 +574,11 @@ sub setChatLayoutMode(mode as integer)
         m.video.streamLayoutMode = 1
     else if mode = 2
         ' Mode 2: Superpuesto / Overlay (Video a pantalla completa, chat flotante a la derecha con fondo semitransparente)
+        ' Altura acotada a 750px (Y=50 a Y=800) para no cubrir NUNCA la seekbar ni los controles inferiores (Y=820..1080)
         m.chatWindow.visible = true
-        m.chatWindow.backgroundOpacity = 0.65
-        m.chatWindow.translation = [screenWidth - chatWidth, 0]
-        m.chatWindow.height = screenHeight
+        m.chatWindow.backgroundOpacity = 0.50
+        m.chatWindow.translation = [screenWidth - chatWidth, 50]
+        m.chatWindow.height = 750
         m.chatWindow.width = chatWidth
 
         m.video.width = screenWidth

@@ -193,7 +193,7 @@
             <Group id="bottomOverlayGroup" translation="[70,835]">
                 <!-- Time Displays -->
                 <SimpleLabel id="timeProgress" fontUri="pkg:/fonts/Archivo-Bold.otf" fontSize="18" color="0xFFFFFFFF" translation="[0,-2]" />
-                <SimpleLabel id="timeDuration" fontUri="pkg:/fonts/Archivo-Bold.otf" fontSize="18" color="0xADADB8FF" translation="[1680,-2]" width="100" horizAlign="right" />
+                <Label id="timeDuration" fontUri="pkg:/fonts/Archivo-Bold.otf" fontSize="18" color="0xADADB8FF" translation="[1680,-2]" width="100" horizAlign="right" />
                 
                 <!-- Progress Bar -->
                 <Rectangle id="progressBarBase" color="0x3A3A3DFF" width="1780" height="8"  translation="[0,26]" />
@@ -307,12 +307,12 @@
         <!-- Toast notifications (outside controlOverlay so they display even when controls are hidden) -->
         <Group id="chatModeToastGroup" translation="[820, 60]" visible="false">
             <Rectangle id="chatModeToastBg" color="0x000000D0" width="280" height="42" />
-            <SimpleLabel id="chatModeToast" translation="[0, 8]" width="280" horizAlign="center" text="" color="0xFFFFFFFF" fontSize="20" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+            <Label id="chatModeToast" translation="[0, 8]" width="280" horizAlign="center" text="" color="0xFFFFFFFF" fontSize="20" fontUri="pkg:/fonts/Archivo-Bold.otf" />
         </Group>
 
         <Group id="muteSkipToastGroup" translation="[760, 60]" visible="false">
             <Rectangle id="muteSkipToastBg" color="0xE91E63E6" width="400" height="42" />
-            <SimpleLabel id="muteSkipToast" translation="[0, 8]" width="400" horizAlign="center" text="" color="0xFFFFFFFF" fontSize="18" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+            <Label id="muteSkipToast" translation="[0, 8]" width="400" horizAlign="center" text="" color="0xFFFFFFFF" fontSize="18" fontUri="pkg:/fonts/Archivo-Bold.otf" />
         </Group>
 
         <!-- Netflix-style Skip Muted Audio Button -->
@@ -321,7 +321,7 @@
             <Rectangle id="skipMuteAccent" color="0xE91E63FF" width="6" height="52" />
             <!-- [OK] badge -->
             <Rectangle color="0xE91E63FF" width="48" height="30" translation="[18, 11]" />
-            <SimpleLabel translation="[18, 16]" width="48" horizAlign="center" text="OK" color="0xFFFFFFFF" fontSize="15" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+            <Label translation="[18, 16]" width="48" horizAlign="center" text="OK" color="0xFFFFFFFF" fontSize="15" fontUri="pkg:/fonts/Archivo-Bold.otf" />
             <!-- Label -->
             <SimpleLabel translation="[78, 13]" text="Saltar silencio" color="0xFFFFFFFF" fontSize="20" fontUri="pkg:/fonts/Archivo-Bold.otf" />
         </Group>
