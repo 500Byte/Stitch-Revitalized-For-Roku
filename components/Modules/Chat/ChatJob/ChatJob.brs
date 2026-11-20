@@ -79,6 +79,9 @@ sub main()
                 else
                     queue.unshift(received)
                     receivedNewMessage = true
+                    while queue.count() > 100
+                        queue.pop()
+                    end while
                 end if
             end if
             if m.top.readyForNextComment and queue.count() > 0
@@ -136,6 +139,9 @@ sub main()
                         queue.pop()
                     end if
                 end if
+            end if
+            if received = "" and (not m.top.readyForNextComment or queue.count() = 0)
+                sleep(25)
             end if
         end while
         m.top.unobserveField("stopRequested")

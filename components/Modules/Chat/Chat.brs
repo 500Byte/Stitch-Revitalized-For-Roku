@@ -458,13 +458,13 @@ sub onNewCommentObj()
                     chatmessage.translation = [chatmessage.translation[0], newY]
                 end if
             end for
-            ' Prevent unbounded node accumulation on high-volume chats
-            while m.chatPanel.getChildCount() > 25
-                m.chatPanel.removeChildIndex(0)
-            end while
         else
             m.translation += (y_translation)
         end if
+        ' Prevent unbounded node accumulation on high-volume chats
+        while m.chatPanel.getChildCount() > 25
+            m.chatPanel.removeChildIndex(0)
+        end while
     end if
     m.chat.readyForNextComment = true
 end sub

@@ -37,6 +37,8 @@ sub fetchNextPage(cursor as dynamic, offset as dynamic)
     commentsData = rsp.data.video.comments
     edges = commentsData.edges
     if edges <> invalid
+        hasNewEmotes = false
+        emoteCache = m.global.emoteCache
         for each edge in edges
             node = edge.node
             if node <> invalid
@@ -50,10 +52,9 @@ sub fetchNextPage(cursor as dynamic, offset as dynamic)
                                 emoteWord = frag.text.trim()
                                 if emoteWord <> ""
                                     emotesList.push({ word: emoteWord, id: frag.emote.emoteID })
-                                    if m.global.emoteCache <> invalid and not m.global.emoteCache.DoesExist(emoteWord)
-                                        emoteCache = m.global.emoteCache
+                                    if emoteCache <> invalid and not emoteCache.DoesExist(emoteWord)
                                         emoteCache[emoteWord] = "https://static-cdn.jtvnw.net/emoticons/v2/" + frag.emote.emoteID + "/static/light/1.0"
-                                        m.global.setField("emoteCache", emoteCache)
+                                        hasNewEmotes = true
                                     end if
                                 end if
                             end if
@@ -101,6 +102,9 @@ sub fetchNextPage(cursor as dynamic, offset as dynamic)
                 end if
             end if
         end for
+        if hasNewEmotes
+            m.global.setField("emoteCache", emoteCache)
+        end if
     end if
 
     if commentsData.pageInfo <> invalid and commentsData.pageInfo.hasNextPage <> invalid

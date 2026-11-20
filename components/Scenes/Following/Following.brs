@@ -199,7 +199,7 @@ end sub
 function findFocusedChannel(newContent as object) as dynamic
     old = m.rowlist.content
     focused = m.rowlist.rowItemFocused
-    if old = invalid or focused = invalid or newContent.getChildCount() = 0 then return invalid
+    if old = invalid or focused = invalid or focused.count() < 2 or newContent.getChildCount() = 0 then return invalid
     oldRow = old.getChild(focused[0])
     oldItem = invalid
     if oldRow <> invalid then oldItem = oldRow.getChild(focused[1])
@@ -218,7 +218,10 @@ function findFocusedChannel(newContent as object) as dynamic
     r = focused[0]
     if r > newContent.getChildCount() - 1 then r = newContent.getChildCount() - 1
     c = focused[1]
-    if c > newContent.getChild(r).getChildCount() - 1 then c = newContent.getChild(r).getChildCount() - 1
+    targetRow = newContent.getChild(r)
+    if targetRow <> invalid and c > targetRow.getChildCount() - 1
+        c = targetRow.getChildCount() - 1
+    end if
     return [r, c]
 end function
 
