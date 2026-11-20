@@ -4,10 +4,17 @@
     <Rectangle
       visible="true"
       id="headerRect"
-      color="0x26262cFF"
+      color="0x18181BFF"
       width="1920"
       height="64"
       translation="[0, 0]"
+    />
+    <Rectangle
+      id="headerBottomBorder"
+      color="0x26262CFF"
+      width="1920"
+      height="1"
+      translation="[0, 64]"
     />
 
     <ButtonGroupHoriz id="MenuOptions" layoutDirection="horiz" horizAlignment="left" />
@@ -22,8 +29,8 @@
       value="[]"
       onChange="updateMenuOptions"
     />
-    <field id="menuTextColor" type="color" value="0xEFEFF1FF" />
-    <field id="menuFocusColor" type="color" value="0x9146FFCC" />
+    <field id="menuTextColor" type="color" value="0xADADB8FF" />
+    <field id="menuFocusColor" type="color" value="0x9146FFFF" />
     <field id="menuOptionsSpacing" type="int" value="0" />
     <field
       id="menuOptionsTranslation"

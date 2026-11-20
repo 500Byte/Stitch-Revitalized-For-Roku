@@ -119,6 +119,7 @@ sub init()
     m.top.observeField("duration", "onDurationChange")
     m.top.observeField("bufferingStatus", "onBufferingStatusChange")
     m.top.observeField("video_type", "onVideoTypeChange")
+    m.top.observeField("video_id", "onVideoIdChange")
 
     ' Initialize UI
     updateProgressBar()
@@ -178,6 +179,12 @@ sub onVideoTypeChange()
         else
             m.loadingText.text = "Loading video..."
         end if
+    end if
+end sub
+
+sub onVideoIdChange()
+    if m.top.video_type = "VOD" and m.top.video_id <> invalid and m.top.video_id <> "" and m.mutedSegments = invalid
+        m.mutedTask = createApiTask("getVodMutedSegmentsQuery", "onMutedSegmentsResponse", { id: m.top.video_id })
     end if
 end sub
 
@@ -355,12 +362,12 @@ sub renderMutedSegments()
         if seg.offset <> invalid and seg.duration <> invalid
             startX = (seg.offset / totalDuration) * baseWidth
             segW = (seg.duration / totalDuration) * baseWidth
-            if segW < 3 then segW = 3 ' Minimum 3px visible segment
+            if segW < 4 then segW = 4 ' Minimum 4px visible segment
 
             rect = createObject("roSGNode", "Rectangle")
             rect.width = segW
-            rect.height = 4
-            rect.color = "0xE91E63FF" ' Twitch muted pink/red color
+            rect.height = 6
+            rect.color = "0xFF3860D0" ' Semi-transparent magenta/coral: renders dark coral on gray track, bright pink on purple progress
             rect.translation = [startX, 0]
             m.mutedSegmentsGroup.appendChild(rect)
         end if
@@ -521,7 +528,7 @@ sub updateProgressBar()
         if dotX < 0 then dotX = 0
         if dotX > m.progressBarBase.width then dotX = m.progressBarBase.width
 
-        m.progressDot.translation = [dotX, 59]
+        m.progressDot.translation = [dotX, 60]
         m.progressDot.visible = true
 
         ' Update time displays
@@ -1185,4 +1192,5 @@ sub onDestroy()
     m.top.unobserveField("duration")
     m.top.unobserveField("bufferingStatus")
     m.top.unobserveField("video_type")
+    m.top.unobserveField("video_id")
 end sub

@@ -56,8 +56,8 @@
             <!-- Progress Bar Section -->
             <Group translation="[60,5]">
                 <!-- Progress Bar (Full Twitch Purple for Live) -->
-                <Rectangle id="progressBarBase" color="0x404040FF" width="1800" height="4" translation="[0,65]" />
-                <Rectangle id="progressBarProgress" color="0x9146FFFF" width="1800" height="4" translation="[0,65]" />
+                <Rectangle id="progressBarBase" color="0x3A3A3DFF" width="1800" height="6" translation="[0,65]" />
+                <Rectangle id="progressBarProgress" color="0x9146FFFF" width="1800" height="6" translation="[0,65]" />
             </Group>
             
             <!-- Control Buttons (Live Stream Layout) -->

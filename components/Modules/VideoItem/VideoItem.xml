@@ -20,15 +20,15 @@
             loadHeight="180"
             loadDisplayMode="scaleToFit">
             <Group id="liveIcon" translation="[8,8]">
-                <Rectangle width="36" height="18" color="0xEB0400FF" />
+                <Rectangle width="44" height="20" color="0xEB0400FF" />
                 <Label
-                    width="36"
-                    height="18"
+                    width="44"
+                    height="20"
                     horizAlign="center"
                     vertAlign="center"
                     color="0xFFFFFFFF"
                     text="LIVE">
-                    <Font role="font" uri="pkg:/fonts/Archivo-Bold.otf" size="12" />
+                    <Font role="font" uri="pkg:/fonts/Archivo-Bold.otf" size="14" />
                 </Label>
             </Group>
 
@@ -55,7 +55,7 @@
             height="30"
             width="320"
             horizAlign="left"
-            color="0xFFFFFFFF"
+            color="0xADADB8FF"
             translation="[0, 210]">
             <Font role="font" uri="pkg:/fonts/Archivo-Regular.otf" size="18" />
         </Label>
@@ -69,7 +69,7 @@
             horizAlign="left"
             color="0xFFFFFFFF"
             translation="[7,157]">
-            <Font role="font" uri="pkg:/fonts/Archivo-Regular.otf" size="14" />
+            <Font role="font" uri="pkg:/fonts/Archivo-Regular.otf" size="16" />
         </Label>
         <Poster
             id="runtimeRect"
@@ -82,7 +82,7 @@
             horizAlign="left"
             color="0xFFFFFFFF"
             translation="[7,23]">
-            <Font role="font" uri="pkg:/fonts/Archivo-Regular.otf" size="14" />
+            <Font role="font" uri="pkg:/fonts/Archivo-Regular.otf" size="16" />
         </Label>
         <Poster
             id="timestampRect"
@@ -94,7 +94,7 @@
             horizAlign="left"
             color="0xFFFFFFFF"
             translation="[7,23]">
-            <Font role="font" uri="pkg:/fonts/Archivo-Regular.otf" size="14" />
+            <Font role="font" uri="pkg:/fonts/Archivo-Regular.otf" size="16" />
         </Label>
 
     </children>
