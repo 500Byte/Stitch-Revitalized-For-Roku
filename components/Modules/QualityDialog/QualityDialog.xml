@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="QualityDialog" extends="Group" xsi:noNamespaceSchemaLocation="https://devtools.web.roku.com/schema/RokuSceneGraph.xsd">
+    <interface>
+        <!-- Array of quality option strings, e.g. ["1080p60 (Source)", "720p60", "720p", "480p", "360p", "160p"] -->
+        <field id="qualityOptions" type="array" onChange="onQualityOptionsChange" />
+        <!-- Currently active quality string -->
+        <field id="currentQuality" type="string" onChange="onCurrentQualityChange" />
+        <!-- Index of the chosen quality -->
+        <field id="selectedQualityIndex" type="integer" value="-1" />
+        <!-- Event fired when a quality option is selected -->
+        <field id="qualitySelected" type="bool" value="false" alwaysNotify="true" />
+        <!-- Event fired when dialog was closed/cancelled -->
+        <field id="wasClosed" type="bool" value="false" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="QualityDialog.brs" />
+
+    <children>
+        <!-- Fullscreen Dim Backdrop -->
+        <Rectangle id="backdrop" color="0x00000099" width="1920" height="1080" translation="[0,0]" />
+
+        <!-- Centered Dialog Modal Container -->
+        <Group id="modalContainer" translation="[620,200]">
+            <!-- Outer Border (Subtle 2px stroke) -->
+            <Rectangle id="cardBorder" color="0x3A3A3DFF" width="680" height="600" />
+            <!-- Inner Card Surface (Twitch Dark) -->
+            <Rectangle id="cardBg" color="0x18181BF8" width="676" height="596" translation="[2,2]" />
+
+            <!-- Header -->
+            <SimpleLabel
+                id="dialogTitle"
+                translation="[36,24]"
+                text="Calidad de Video"
+                color="0xFFFFFFFF"
+                fontSize="24"
+                fontUri="pkg:/fonts/Archivo-Bold.otf" />
+            <SimpleLabel
+                id="dialogSubtitle"
+                translation="[36,58]"
+                text="Selecciona una resolución para este contenido"
+                color="0xADADB8FF"
+                fontSize="14"
+                fontUri="pkg:/fonts/Archivo-Regular.otf" />
+            <Rectangle id="headerDivider" color="0x26262CFF" width="608" height="1" translation="[36,86]" />
+
+            <!-- Dynamic Options Container -->
+            <Group id="optionsContainer" translation="[36,98]" />
+
+            <!-- Cancel Button -->
+            <Group id="cancelButtonGroup" translation="[36,520]">
+                <Poster id="cancelBg" uri="pkg:/images/capsule.9.png" width="608" height="52" blendColor="0x26262CBB" />
+                <Poster id="cancelFocus" uri="pkg:/images/capsule.9.png" width="608" height="52" blendColor="0x9146FFFF" visible="false" />
+                <SimpleLabel
+                    translation="[0,15]"
+                    width="608"
+                    horizAlign="center"
+                    text="Cancelar"
+                    color="0xFFFFFFFF"
+                    fontSize="18"
+                    fontUri="pkg:/fonts/Archivo-Bold.otf" />
+            </Group>
+        </Group>
+    </children>
+</component>

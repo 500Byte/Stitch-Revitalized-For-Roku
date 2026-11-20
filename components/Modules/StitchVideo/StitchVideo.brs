@@ -41,8 +41,12 @@ sub init()
     m.loadingOverlay = m.top.findNode("loadingOverlay")
     m.loadingSpinner = m.top.findNode("loadingSpinner")
 
-    ' Quality dialog
-    ' Created per show and presented via scene.dialog (Back closes it natively), see showQualityDialog()
+    ' Quality dialog modal
+    m.qualityModal = m.top.findNode("qualityDialogModal")
+    if m.qualityModal <> invalid
+        m.qualityModal.observeField("qualitySelected", "onQualityModalSelected")
+        m.qualityModal.observeField("wasClosed", "onQualityModalClosed")
+    end if
     m.qualityDialog = invalid
 
     ' State variables
@@ -505,39 +509,29 @@ sub onSelectedQualityChange()
     setupLiveUI()
 end sub
 
-sub onQualityButtonSelect()
-    selectedIndex = m.qualityDialog.buttonSelected
-    totalButtons = m.qualityDialog.buttons.count()
-
-    closeQualityDialog()
-
-    ' Last button is Cancel: no change
-    if selectedIndex >= 0 and selectedIndex < totalButtons - 1 and selectedIndex < m.top.qualityOptions.count()
+sub onQualityModalSelected()
+    if m.qualityModal = invalid then return
+    selectedIndex = m.qualityModal.selectedQualityIndex
+    if selectedIndex >= 0 and selectedIndex < m.top.qualityOptions.count()
         m.top.selectedQuality = m.top.qualityOptions[selectedIndex]
         m.top.QualityChangeRequest = selectedIndex
         m.top.QualityChangeRequestFlag = true
     end if
-end sub
-
-' Back (or any close not via a button): no change
-sub onQualityDialogClosed()
-    closeQualityDialog()
-end sub
-
-' Idempotent: unobserve, dismiss the scene dialog, restore focus and overlay
-sub closeQualityDialog()
-    dlg = m.qualityDialog
-    if dlg = invalid then return
-    m.qualityDialog = invalid
-    dlg.unobserveFieldScoped("buttonSelected")
-    dlg.unobserveFieldScoped("wasClosed")
-    scene = m.top.getScene()
-    if scene <> invalid and scene.dialog <> invalid and scene.dialog.isSameNode(dlg) then scene.dialog = invalid
-
     m.top.setFocus(true)
-    if m.isOverlayVisible
-        focusButton(m.currentFocusedButton)
-        m.fadeAwayTimer.control = "stop"
+    if m.fadeAwayTimer <> invalid then m.fadeAwayTimer.control = "start"
+end sub
+
+sub onQualityModalClosed()
+    m.top.setFocus(true)
+    if m.fadeAwayTimer <> invalid then m.fadeAwayTimer.control = "start"
+end sub
+
+sub closeQualityDialog()
+    if m.qualityModal <> invalid and m.qualityModal.visible
+        m.qualityModal.visible = false
+        m.top.setFocus(true)
+    end if
+    if m.fadeAwayTimer <> invalid
         m.fadeAwayTimer.control = "start"
     end if
 end sub
@@ -614,24 +608,13 @@ sub togglePlayPause()
 end sub
 
 sub showQualityDialog()
-    scene = m.top.getScene()
-    if scene = invalid or m.qualityDialog <> invalid then return
+    if m.qualityModal = invalid then return
     if m.top.qualityOptions <> invalid and m.top.qualityOptions.count() > 0
         m.fadeAwayTimer.control = "stop"
-
-        dlg = createObject("roSGNode", "StandardMessageDialog")
-        dlg.title = "Please Choose Your Video Quality"
-        dlg.message = ["Choose video quality:"]
-        buttons = []
-        for each quality in m.top.qualityOptions
-            buttons.push(quality)
-        end for
-        buttons.push("Cancel")
-        dlg.buttons = buttons
-        dlg.observeFieldScoped("buttonSelected", "onQualityButtonSelect")
-        dlg.observeFieldScoped("wasClosed", "onQualityDialogClosed")
-        m.qualityDialog = dlg
-        scene.dialog = dlg
+        m.qualityModal.qualityOptions = m.top.qualityOptions
+        m.qualityModal.currentQuality = m.top.selectedQuality
+        m.qualityModal.visible = true
+        m.qualityModal.setFocus(true)
     end if
 end sub
 

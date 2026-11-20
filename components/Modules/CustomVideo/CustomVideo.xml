@@ -325,5 +325,8 @@
             <!-- Label -->
             <SimpleLabel translation="[78, 13]" text="Saltar silencio" color="0xFFFFFFFF" fontSize="20" fontUri="pkg:/fonts/Archivo-Bold.otf" />
         </Group>
+
+        <!-- Modern Quality Selection Modal (Twitch TV style) -->
+        <QualityDialog id="qualityDialogModal" visible="false" />
     </children>
 </component>

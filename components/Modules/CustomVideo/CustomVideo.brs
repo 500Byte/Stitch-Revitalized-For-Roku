@@ -46,6 +46,11 @@ sub init()
     m.topOverlayGroup = m.top.findNode("topOverlayGroup")
     m.bottomOverlayGroup = m.top.findNode("bottomOverlayGroup")
     m.actionControlsGroup = m.top.findNode("actionControlsGroup")
+    m.qualityModal = m.top.findNode("qualityDialogModal")
+    if m.qualityModal <> invalid
+        m.qualityModal.observeField("qualitySelected", "onQualityModalSelected")
+        m.qualityModal.observeField("wasClosed", "onQualityModalClosed")
+    end if
     m.qualityDialog = invalid
 
     ' Time travel dialog
@@ -1230,47 +1235,37 @@ sub onDestroy()
 end sub
 
 sub showQualityDialog()
-    scene = m.top.getScene()
-    if scene = invalid or m.qualityDialog <> invalid then return
+    if m.qualityModal = invalid then return
     if m.top.qualityOptions <> invalid and m.top.qualityOptions.count() > 0
         m.fadeAwayTimer.control = "stop"
-
-        dlg = createObject("roSGNode", "StandardMessageDialog")
-        dlg.title = "Calidad de Video"
-        dlg.message = ["Selecciona la calidad:"]
-        buttons = []
-        for each quality in m.top.qualityOptions
-            buttons.push(quality)
-        end for
-        buttons.push("Cancelar")
-        dlg.buttons = buttons
-        dlg.observeFieldScoped("buttonSelected", "onQualityButtonSelect")
-        dlg.observeFieldScoped("wasClosed", "onQualityDialogClosed")
-        m.qualityDialog = dlg
-        scene.dialog = dlg
+        m.qualityModal.qualityOptions = m.top.qualityOptions
+        m.qualityModal.currentQuality = m.top.selectedQuality
+        m.qualityModal.visible = true
+        m.qualityModal.setFocus(true)
     end if
 end sub
 
-sub onQualityButtonSelect()
-    if m.qualityDialog = invalid then return
-    selectedIndex = m.qualityDialog.buttonSelected
-    totalButtons = m.qualityDialog.buttons.count()
-    closeQualityDialog()
-    if selectedIndex >= 0 and selectedIndex < totalButtons - 1 and selectedIndex < m.top.qualityOptions.count()
+sub onQualityModalSelected()
+    if m.qualityModal = invalid then return
+    selectedIndex = m.qualityModal.selectedQualityIndex
+    if selectedIndex >= 0 and selectedIndex < m.top.qualityOptions.count()
         m.top.selectedQuality = m.top.qualityOptions[selectedIndex]
         m.top.QualityChangeRequest = selectedIndex
         m.top.QualityChangeRequestFlag = true
     end if
+    m.top.setFocus(true)
+    if m.fadeAwayTimer <> invalid then m.fadeAwayTimer.control = "start"
 end sub
 
-sub onQualityDialogClosed()
-    closeQualityDialog()
+sub onQualityModalClosed()
+    m.top.setFocus(true)
+    if m.fadeAwayTimer <> invalid then m.fadeAwayTimer.control = "start"
 end sub
 
 sub closeQualityDialog()
-    if m.qualityDialog <> invalid
-        m.qualityDialog.close = true
-        m.qualityDialog = invalid
+    if m.qualityModal <> invalid and m.qualityModal.visible
+        m.qualityModal.visible = false
+        m.top.setFocus(true)
     end if
     if m.fadeAwayTimer <> invalid
         m.fadeAwayTimer.control = "start"
