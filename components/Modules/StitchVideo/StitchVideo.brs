@@ -91,6 +91,7 @@ sub init()
 
     m.chatModeToastGroup = m.top.findNode("chatModeToastGroup")
     m.chatModeToast = m.top.findNode("chatModeToast")
+    m.uptimeLabel = m.top.findNode("uptimeLabel")
 
     ' Observers
     m.top.observeField("position", "onPositionChange")
@@ -161,7 +162,9 @@ end sub
 
 sub onPositionChange()
     m.currentPositionSeconds = m.top.position
-    ' Live streams don't need position-based updates
+    if m.isOverlayVisible = true
+        updateUptime()
+    end if
 end sub
 
 ' Re-arm the one-shot startup seek when a fresh stream is loaded.
@@ -400,6 +403,33 @@ sub hideChatToast()
     if m.chatModeToastGroup <> invalid then m.chatModeToastGroup.visible = false
 end sub
 
+sub updateUptime()
+    if m.uptimeLabel = invalid then return
+    if m.top?.content?.createdAt <> invalid and m.top.content.createdAt <> ""
+        startDt = createObject("roDateTime")
+        startDt.FromISO8601String(m.top.content.createdAt.toStr())
+        nowSec = createObject("roDateTime").AsSeconds()
+        uptimeSec = nowSec - startDt.AsSeconds()
+        if uptimeSec > 0
+            hours = Int(uptimeSec / 3600)
+            minutes = Int((uptimeSec mod 3600) / 60)
+            seconds = uptimeSec mod 60
+
+            hStr = hours.toStr()
+            if hours < 10 then hStr = "0" + hStr
+            mStr = minutes.toStr()
+            if minutes < 10 then mStr = "0" + mStr
+            sStr = seconds.toStr()
+            if seconds < 10 then sStr = "0" + sStr
+
+            m.uptimeLabel.text = "Uptime: " + hStr + ":" + mStr + ":" + sStr
+            m.uptimeLabel.visible = true
+            return
+        end if
+    end if
+    m.uptimeLabel.visible = false
+end sub
+
 sub onDurationChange()
     updateProgressBar()
 end sub
@@ -459,6 +489,7 @@ sub showOverlay()
     m.isOverlayVisible = true
     m.controlOverlay.visible = true
     m.liveIndicator.visible = true
+    updateUptime()
     focusButton(m.currentFocusedButton)
 
     ' Start fade timer

@@ -245,10 +245,11 @@
                 </EmojiLabel>
             </Group>
             
-            <!-- Live Indicator -->
-            <Group id="liveIndicator" translation="[1740,15]" visible="false">
-                <Rectangle color="0xFF0000FF" width="60" height="24" />
-                <SimpleLabel translation="[12,3]" text="LIVE" color="0xFFFFFFFF" fontSize="16" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+            <!-- Live Indicator & Uptime -->
+            <Group id="liveIndicator" translation="[1640,15]" visible="false">
+                <Rectangle color="0xEB0400FF" width="56" height="24" />
+                <SimpleLabel translation="[10,3]" text="LIVE" color="0xFFFFFFFF" fontSize="16" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+                <SimpleLabel id="uptimeLabel" translation="[66,3]" text="" color="0xADADB8FF" fontSize="16" fontUri="pkg:/fonts/Archivo-Bold.otf" visible="false" />
             </Group>
             
         </Group>

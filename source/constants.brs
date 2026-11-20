@@ -54,6 +54,18 @@ sub setConstants()
                 "VideoPlayer"
             ],
             colors: {
+                semantic: {
+                    bgCanvas: "0x0E0E10FF",
+                    bgSurface: "0x18181BFF",
+                    bgOverlay: "0x1F1F23EE",
+                    bgDialog: "0x18181BFA",
+                    focusRing: "0x9146FFFF",
+                    accentLive: "0xEB0400FF",
+                    accentMute: "0xE91E63FF",
+                    textPrimary: "0xFFFFFFFF",
+                    textSecondary: "0xADADB8FF",
+                    textMuted: "0x53535FFF"
+                },
                 muted: {
                     black: "0x020202FF",
                     ice: "0xd6e4ffFF",

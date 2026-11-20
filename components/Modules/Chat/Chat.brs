@@ -202,14 +202,79 @@ end function
 function buildUsername(display_name, color)
     username = createObject("roSGNode", "SimpleLabel")
     username.text = display_name
-    if color = ""
-        color = "FFFFFF"
-    end if
-    username.color = "0x" + color + "FF"
+    readableColor = getReadableUsernameColor(color, display_name)
+    username.color = "0x" + readableColor + "FF"
     username.visible = true
     username.fontSize = m.font_size
     username.fontUri = "pkg:/fonts/Archivo-Bold.otf"
     return username
+end function
+
+' FrankerFaceZ readable username color algorithm for dark backgrounds
+function getReadableUsernameColor(rawColor as string, displayName as string) as string
+    cleanColor = ""
+    if rawColor <> invalid
+        cleanColor = UCase(rawColor.replace("#", "").trim())
+    end if
+
+    ' 1. If user has no color set, generate consistent pastel color from default Twitch palette
+    if cleanColor = "" or len(cleanColor) <> 6
+        defaultColors = [
+            "FF4A80", "FF7054", "FFA500", "00C896", "1E90FF",
+            "A970FF", "2ECC71", "E67E22", "E74C3C", "3498DB",
+            "F1C40F", "1ABC9C", "9B59B6", "00D2D3", "6C5CE7"
+        ]
+        hashVal = 0
+        if displayName <> invalid
+            for i = 1 to len(displayName)
+                hashVal = (hashVal * 31 + asc(mid(displayName, i, 1))) mod defaultColors.count()
+            end for
+        end if
+        if hashVal < 0 then hashVal = 0 - hashVal
+        return defaultColors[hashVal]
+    end if
+
+    ' 2. Parse RGB hex
+    r = parseHexPair(mid(cleanColor, 1, 2))
+    g = parseHexPair(mid(cleanColor, 3, 2))
+    b = parseHexPair(mid(cleanColor, 5, 2))
+
+    ' 3. Calculate perceptual luminance (Y)
+    lum = (0.299 * r) + (0.587 * g) + (0.114 * b)
+
+    ' 4. FFZ readable colors algorithm for dark backgrounds:
+    ' If luminance is below 115, lighten color while preserving hue
+    if lum < 115
+        diff = 115 - lum
+        ratio = diff / 160.0
+        r = Int(r + (255 - r) * ratio)
+        g = Int(g + (255 - g) * ratio)
+        b = Int(b + (255 - b) * ratio)
+        if r > 255 then r = 255
+        if g > 255 then g = 255
+        if b > 255 then b = 255
+    end if
+
+    return toHexPair(r) + toHexPair(g) + toHexPair(b)
+end function
+
+function parseHexPair(hexStr as string) as integer
+    digits = "0123456789ABCDEF"
+    if len(hexStr) < 2 then return 255
+    d1 = instr(1, digits, mid(hexStr, 1, 1)) - 1
+    d2 = instr(1, digits, mid(hexStr, 2, 1)) - 1
+    if d1 < 0 then d1 = 15
+    if d2 < 0 then d2 = 15
+    return (d1 * 16) + d2
+end function
+
+function toHexPair(val as integer) as string
+    digits = "0123456789ABCDEF"
+    if val < 0 then val = 0
+    if val > 255 then val = 255
+    d1 = Int(val / 16)
+    d2 = val mod 16
+    return mid(digits, d1 + 1, 1) + mid(digits, d2 + 1, 1)
 end function
 
 function buildColon()

@@ -67,6 +67,7 @@ sub init()
     m.thumbnailImage = m.top.findNode("thumbnailImage")
     m.thumbnailTime = m.top.findNode("thumbnailTime")
     m.liveIndicator = m.top.findNode("liveIndicator")
+    m.uptimeLabel = m.top.findNode("uptimeLabel")
     m.loadingOverlay = m.top.findNode("loadingOverlay")
     m.loadingText = m.top.findNode("loadingText")
     m.loadingSpinner = m.top.findNode("loadingSpinner")
@@ -205,6 +206,7 @@ sub onPositionChange()
     if not m.isSeekMode
         updateProgressBar()
     end if
+    if m.isLiveStream and m.isOverlayVisible then updateUptime()
 
     ' Auto-skip muted audio segments if enabled, or show Skip Mute button (like Netflix "Skip Intro")
     if m.mutedSegments <> invalid and not m.isSeekMode
@@ -435,6 +437,33 @@ sub hideSkipMuteButton()
     end if
 end sub
 
+sub updateUptime()
+    if m.uptimeLabel = invalid then return
+    if m.top?.content?.createdAt <> invalid and m.top.content.createdAt <> ""
+        startDt = createObject("roDateTime")
+        startDt.FromISO8601String(m.top.content.createdAt.toStr())
+        nowSec = createObject("roDateTime").AsSeconds()
+        uptimeSec = nowSec - startDt.AsSeconds()
+        if uptimeSec > 0
+            hours = Int(uptimeSec / 3600)
+            minutes = Int((uptimeSec mod 3600) / 60)
+            seconds = uptimeSec mod 60
+
+            hStr = hours.toStr()
+            if hours < 10 then hStr = "0" + hStr
+            mStr = minutes.toStr()
+            if minutes < 10 then mStr = "0" + mStr
+            sStr = seconds.toStr()
+            if seconds < 10 then sStr = "0" + sStr
+
+            m.uptimeLabel.text = "Uptime: " + hStr + ":" + mStr + ":" + sStr
+            m.uptimeLabel.visible = true
+            return
+        end if
+    end if
+    m.uptimeLabel.visible = false
+end sub
+
 sub onBufferingStatusChange()
     if m.top.bufferingStatus <> invalid
         bufferPercent = m.top.bufferingStatus.percentage
@@ -475,6 +504,7 @@ sub showOverlay()
     m.isOverlayVisible = true
     m.controlOverlay.visible = true
     updateUIForVideoType() ' Ensure UI is correct for video type
+    if m.isLiveStream then updateUptime()
     focusButton(m.currentFocusedButton)
 
     ' Start fade timer
