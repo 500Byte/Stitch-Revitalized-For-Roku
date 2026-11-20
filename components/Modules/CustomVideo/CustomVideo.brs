@@ -46,6 +46,8 @@ sub init()
     m.topOverlayGroup = m.top.findNode("topOverlayGroup")
     m.bottomOverlayGroup = m.top.findNode("bottomOverlayGroup")
     m.actionControlsGroup = m.top.findNode("actionControlsGroup")
+    m.scrimTop = m.top.findNode("scrimTop")
+    m.scrimBottom = m.top.findNode("scrimBottom")
     m.qualityModal = m.top.findNode("qualityDialogModal")
     if m.qualityModal <> invalid
         m.qualityModal.observeField("qualitySelected", "onQualityModalSelected")
@@ -126,6 +128,7 @@ sub init()
     m.top.observeField("position", "onPositionChange")
     m.top.observeField("state", "onVideoStateChange")
     m.top.observeField("chatIsVisible", "onChatVisibilityChange")
+    m.top.observeField("chatWidth", "onChatVisibilityChange")
     m.top.observeField("streamLayoutMode", "onStreamLayoutModeChange")
     m.top.observeField("duration", "onDurationChange")
     m.top.observeField("bufferingStatus", "onBufferingStatusChange")
@@ -306,8 +309,10 @@ sub onVideoStateChange()
 end sub
 
 sub onChatVisibilityChange()
-    chatW = 495
-    if m.global.constants <> invalid and m.global.constants.chatWidth <> invalid and m.global.constants.chatWidth > 0
+    chatW = 420
+    if m.top.chatWidth <> invalid and m.top.chatWidth > 0
+        chatW = m.top.chatWidth
+    else if m.global.constants <> invalid and m.global.constants.chatWidth <> invalid and m.global.constants.chatWidth > 0
         chatW = m.global.constants.chatWidth
     end if
 
@@ -338,6 +343,9 @@ sub onChatVisibilityChange()
         if m.liveIndicator <> invalid
             m.liveIndicator.translation = [videoW - 270, 48]
         end if
+
+        if m.scrimBottom <> invalid then m.scrimBottom.width = videoW
+        if m.scrimTop <> invalid then m.scrimTop.width = videoW
     else
         m.progressBarBase.width = 1780
         if m.actionControlsGroup <> invalid
@@ -352,6 +360,9 @@ sub onChatVisibilityChange()
         if m.liveIndicator <> invalid
             m.liveIndicator.translation = [1630, 48]
         end if
+
+        if m.scrimBottom <> invalid then m.scrimBottom.width = 1920
+        if m.scrimTop <> invalid then m.scrimTop.width = 1920
     end if
 
     ' Update all progress bar elements to match new width
@@ -478,8 +489,15 @@ sub showSkipMuteButton()
     if m.skipMuteButton = invalid then return
     btnWidth = 360
     margin = 50
-    if m.top.width <> invalid and m.top.width > 0 and m.top.chatIsVisible
-        btnX = m.top.width - btnWidth - margin
+    chatW = 420
+    if m.top.chatWidth <> invalid and m.top.chatWidth > 0
+        chatW = m.top.chatWidth
+    else if m.global.constants <> invalid and m.global.constants.chatWidth <> invalid and m.global.constants.chatWidth > 0
+        chatW = m.global.constants.chatWidth
+    end if
+
+    if m.top.chatIsVisible
+        btnX = (1920 - chatW) - btnWidth - margin
     else
         btnX = 1920 - btnWidth - margin
     end if
@@ -1226,6 +1244,7 @@ sub onDestroy()
     m.top.unobserveField("position")
     m.top.unobserveField("state")
     m.top.unobserveField("chatIsVisible")
+    m.top.unobserveField("chatWidth")
     m.top.unobserveField("streamLayoutMode")
     m.top.unobserveField("duration")
     m.top.unobserveField("bufferingStatus")

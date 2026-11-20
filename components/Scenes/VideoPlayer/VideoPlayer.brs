@@ -558,6 +558,7 @@ sub setChatLayoutMode(mode as integer)
     end if
 
     m.chatLayoutMode = mode
+    m.video.chatWidth = chatWidth
 
     if mode = 1
         ' Mode 1: Sidebar (Lado a lado, fondo negro solido, video redimensionado a la izquierda)
@@ -573,18 +574,18 @@ sub setChatLayoutMode(mode as integer)
         m.video.chatIsVisible = true
         m.video.streamLayoutMode = 1
     else if mode = 2
-        ' Mode 2: Superpuesto / Overlay (Video a pantalla completa, chat flotante a la derecha con fondo semitransparente)
-        ' Altura acotada a 750px (Y=50 a Y=800) para no cubrir NUNCA la seekbar ni los controles inferiores (Y=820..1080)
+        ' Mode 2: Superpuesto / Overlay (Video a pantalla completa, chat flotante a la derecha con fondo semitransparente a todo el alto)
+        ' Los controles se contraen (chatIsVisible = true) para no ocupar todo el ancho ni meterse bajo el chat
         m.chatWindow.visible = true
         m.chatWindow.backgroundOpacity = 0.50
-        m.chatWindow.translation = [screenWidth - chatWidth, 50]
-        m.chatWindow.height = 750
+        m.chatWindow.translation = [screenWidth - chatWidth, 0]
+        m.chatWindow.height = screenHeight
         m.chatWindow.width = chatWidth
 
         m.video.width = screenWidth
         m.video.height = screenHeight
         m.video.translation = [0, 0]
-        m.video.chatIsVisible = false
+        m.video.chatIsVisible = true
         m.video.streamLayoutMode = 2
     else
         ' Mode 0: Oculto (Video a pantalla completa, chat apagado)

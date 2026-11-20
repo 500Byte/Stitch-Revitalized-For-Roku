@@ -35,6 +35,7 @@
              User-initiated paths (first open, re-open from home/channel page,
              quality change) leave this false so they get the low-latency seek. -->
         <field id="suppressStartupSeek" type="bool" value="false" />
+        <field id="chatWidth" type="Integer" value="420" />
 
     </interface>
     
@@ -48,10 +49,10 @@
         <!-- Modern Floating HUD for Live Streams (Punto Medio LG + Apple TV) -->
         <Group id="controlOverlay" visible="false">
             <!-- Top Scrim Gradient -->
-            <Poster uri="pkg:/images/scrim_top.png" width="1920" height="180" loadDisplayMode="scaleToFit" translation="[0,0]" />
+            <Poster id="scrimTop" uri="pkg:/images/scrim_top.png" width="1920" height="180" loadDisplayMode="scaleToFit" translation="[0,0]" />
 
             <!-- Bottom Scrim Gradient (Cinema Contrast) -->
-            <Poster uri="pkg:/images/scrim_bottom.png" width="1920" height="340" loadDisplayMode="scaleToFit" translation="[0,740]" />
+            <Poster id="scrimBottom" uri="pkg:/images/scrim_bottom.png" width="1920" height="340" loadDisplayMode="scaleToFit" translation="[0,740]" />
 
             <!-- Top Floating Header (Live Indicator & Uptime) -->
             <Group id="topOverlayGroup" translation="[0,48]">

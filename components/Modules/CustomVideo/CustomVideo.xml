@@ -22,6 +22,7 @@
         <field id="streamCreatedAt" type="string" />
         <field id="qualityOptions" type="array" />
         <field id="selectedQuality" type="string" />
+        <field id="chatWidth" type="Integer" value="420" />
     </interface>
     <script type="text/brightscript" uri="CustomVideo.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/config.brs" />
@@ -171,10 +172,10 @@
         <!-- Modern Floating HUD (Dual-Zone with Scrims - Punto Medio LG + Apple TV) -->
         <Group id="controlOverlay" visible="false">
             <!-- Top Scrim Gradient -->
-            <Poster uri="pkg:/images/scrim_top.png" width="1920" height="180" loadDisplayMode="scaleToFit" translation="[0,0]" />
+            <Poster id="scrimTop" uri="pkg:/images/scrim_top.png" width="1920" height="180" loadDisplayMode="scaleToFit" translation="[0,0]" />
 
             <!-- Bottom Scrim Gradient (Cinema Contrast) -->
-            <Poster uri="pkg:/images/scrim_bottom.png" width="1920" height="340" loadDisplayMode="scaleToFit" translation="[0,740]" />
+            <Poster id="scrimBottom" uri="pkg:/images/scrim_bottom.png" width="1920" height="340" loadDisplayMode="scaleToFit" translation="[0,740]" />
 
             <!-- Top Floating Header (Live Indicator & Status) -->
             <Group id="topOverlayGroup" translation="[0,48]">

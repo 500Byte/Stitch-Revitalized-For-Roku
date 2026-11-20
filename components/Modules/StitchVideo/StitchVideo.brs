@@ -31,6 +31,8 @@ sub init()
     m.topOverlayGroup = m.top.findNode("topOverlayGroup")
     m.bottomOverlayGroup = m.top.findNode("bottomOverlayGroup")
     m.actionControlsGroup = m.top.findNode("actionControlsGroup")
+    m.scrimTop = m.top.findNode("scrimTop")
+    m.scrimBottom = m.top.findNode("scrimBottom")
 
     ' Video info
     m.videoTitle = m.top.findNode("videoTitle")
@@ -108,6 +110,7 @@ sub init()
     m.top.observeField("state", "onVideoStateChange")
     m.top.observeField("content", "onContentChange")
     m.top.observeField("chatIsVisible", "onChatVisibilityChange")
+    m.top.observeField("chatWidth", "onChatVisibilityChange")
     m.top.observeField("streamLayoutMode", "onStreamLayoutModeChange")
     m.top.observeField("duration", "onDurationChange")
     m.top.observeField("bufferingStatus", "onBufferingStatusChange")
@@ -366,8 +369,10 @@ sub issueLiveEdgeSeek(reason as string)
 end sub
 
 sub onChatVisibilityChange()
-    chatW = 495
-    if m.global.constants <> invalid and m.global.constants.chatWidth <> invalid and m.global.constants.chatWidth > 0
+    chatW = 420
+    if m.top.chatWidth <> invalid and m.top.chatWidth > 0
+        chatW = m.top.chatWidth
+    else if m.global.constants <> invalid and m.global.constants.chatWidth <> invalid and m.global.constants.chatWidth > 0
         chatW = m.global.constants.chatWidth
     end if
 
@@ -391,6 +396,9 @@ sub onChatVisibilityChange()
         if m.liveIndicator <> invalid
             m.liveIndicator.translation = [videoW - 270, 48]
         end if
+
+        if m.scrimBottom <> invalid then m.scrimBottom.width = videoW
+        if m.scrimTop <> invalid then m.scrimTop.width = videoW
     else
         m.progressBarBase.width = 1780
         m.progressBarProgress.width = 1780
@@ -403,6 +411,9 @@ sub onChatVisibilityChange()
         if m.liveIndicator <> invalid
             m.liveIndicator.translation = [1630, 48]
         end if
+
+        if m.scrimBottom <> invalid then m.scrimBottom.width = 1920
+        if m.scrimTop <> invalid then m.scrimTop.width = 1920
     end if
     updateProgressBar()
 end sub
@@ -814,6 +825,7 @@ sub onDestroy()
     m.top.unobserveField("state")
     m.top.unobserveField("content")
     m.top.unobserveField("chatIsVisible")
+    m.top.unobserveField("chatWidth")
     m.top.unobserveField("streamLayoutMode")
     m.top.unobserveField("duration")
     m.top.unobserveField("bufferingStatus")
