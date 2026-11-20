@@ -522,8 +522,15 @@ sub onToggleChat()
             showChatOffNotice()
         else if m.chatWindow <> invalid
             if m.chatLayoutMode = invalid then m.chatLayoutMode = 0
-            m.chatLayoutMode = (m.chatLayoutMode + 1) mod 3
-            setChatLayoutMode(m.chatLayoutMode)
+            ' Deterministic cycle: Sidebar (1) -> Overlay (2) -> Hidden (0) -> Sidebar (1)
+            if m.chatLayoutMode = 1
+                nextMode = 2
+            else if m.chatLayoutMode = 2
+                nextMode = 0
+            else
+                nextMode = 1
+            end if
+            setChatLayoutMode(nextMode)
         end if
         m.video.toggleChat = false ' Reset the flag on the video component
     end if
@@ -534,7 +541,14 @@ sub setChatLayoutMode(mode as integer)
 
     screenWidth = m.global.constants.screenWidth
     screenHeight = m.global.constants.screenHeight
-    chatWidth = 380
+
+    ' Configurable chat width: 400px, 420px, 480px (25vw), or 576px (30vw)
+    chatWidthSetting = get_user_setting("ChatWidth", "420")
+    chatWidth = Val(chatWidthSetting)
+    if chatWidth < 300 then chatWidth = 420
+    if screenWidth < 1920 and screenWidth > 0
+        chatWidth = Int(chatWidth * (screenWidth / 1920.0))
+    end if
 
     m.chatLayoutMode = mode
 

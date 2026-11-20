@@ -80,6 +80,31 @@
         ]
     },
     {
+        "title": "Chat Width",
+        "description": "Width of the chat panel on screen.",
+        "settingName": "ChatWidth",
+        "type": "radio",
+        "default": "420",
+        "options": [
+            {
+                "title": "400px (~21vw - Compact)",
+                "id": "400"
+            },
+            {
+                "title": "420px (~22vw - Standard)",
+                "id": "420"
+            },
+            {
+                "title": "480px (~25vw - Medium)",
+                "id": "480"
+            },
+            {
+                "title": "576px (30vw - Wide)",
+                "id": "576"
+            }
+        ]
+    },
+    {
         "title": "BetterTTV Emotes",
         "description": "Enables or Disables BetterTTV Emotes",
         "settingName": "BetterTTVEmote",

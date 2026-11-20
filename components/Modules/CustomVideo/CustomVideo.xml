@@ -190,10 +190,6 @@
                     <Rectangle color="0xFFFFFFFF" width="8" height="8"  translation="[4,4]" />
                 </Group>
             </Group>
-            
-            <!-- Toast notifications for chat mode & mute skip -->
-            <SimpleLabel id="chatModeToast" translation="[960, 50]" text="" color="0x9146FFFF" fontSize="18" fontUri="pkg:/fonts/Archivo-Bold.otf" visible="false" />
-            <SimpleLabel id="muteSkipToast" translation="[860, 50]" text="" color="0xE91E63FF" fontSize="18" fontUri="pkg:/fonts/Archivo-Bold.otf" visible="false" />
 
             <!-- Control Buttons -->
             <Group translation="[0,95]">
@@ -289,6 +285,28 @@
                     fontSize="18"
                     fontUri="pkg:/fonts/Archivo-Regular.otf" />
             </LayoutGroup>
+        </Group>
+
+        <!-- Toast notifications (outside controlOverlay so they display even when controls are hidden) -->
+        <Group id="chatModeToastGroup" translation="[820, 60]" visible="false">
+            <Rectangle id="chatModeToastBg" color="0x000000D0" width="280" height="42" />
+            <SimpleLabel id="chatModeToast" translation="[0, 8]" width="280" horizAlign="center" text="" color="0xFFFFFFFF" fontSize="20" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+        </Group>
+
+        <Group id="muteSkipToastGroup" translation="[760, 60]" visible="false">
+            <Rectangle id="muteSkipToastBg" color="0xE91E63E6" width="400" height="42" />
+            <SimpleLabel id="muteSkipToast" translation="[0, 8]" width="400" horizAlign="center" text="" color="0xFFFFFFFF" fontSize="18" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+        </Group>
+
+        <!-- Netflix-style Skip Muted Audio Button -->
+        <Group id="skipMuteButton" translation="[1480, 840]" visible="false">
+            <Rectangle id="skipMuteBg" color="0x18181BF0" width="360" height="52" />
+            <Rectangle id="skipMuteAccent" color="0xE91E63FF" width="6" height="52" />
+            <!-- [OK] badge -->
+            <Rectangle color="0xE91E63FF" width="48" height="30" translation="[18, 11]" />
+            <SimpleLabel translation="[18, 16]" width="48" horizAlign="center" text="OK" color="0xFFFFFFFF" fontSize="15" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+            <!-- Label -->
+            <SimpleLabel translation="[78, 13]" text="Saltar silencio" color="0xFFFFFFFF" fontSize="20" fontUri="pkg:/fonts/Archivo-Bold.otf" />
         </Group>
     </children>
 </component>

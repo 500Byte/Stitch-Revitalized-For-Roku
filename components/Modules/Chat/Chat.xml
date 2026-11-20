@@ -12,13 +12,12 @@
         <field id="doneFocus" type="Boolean" value="false" />
         <field id="clientInfo" type="assocarray" />
         <field id="clientMessage" type="string" value="" />
-        <field id="width" type="integer" value="380" alias="chatPanel.width, chatBackground.width" onchange="updatePanelTranslation" />
+        <field id="width" type="integer" value="420" alias="chatPanel.width, chatBackground.width" onchange="updatePanelTranslation" />
         <field id="height" type="integer" value="1080" alias="chatPanel.height, chatBackground.height" onChange="updatePanelTranslation" />
         <field id="forceLive" type="bool" value="false" />
         <field id="isVod" type="bool" value="false" />
         <field id="videoId" type="string" value="" />
         <field id="videoPosition" type="float" value="0.0" onChange="onVideoPositionChange" alwaysNotify="true" />
-        <field id="translation" type="vector2d" alias="chatPanel.translation" />
         <field id="fontSize" type="integer" value="20" onChange="updatePanelTranslation" />
         <function name="stopJobs" />
     </interface>

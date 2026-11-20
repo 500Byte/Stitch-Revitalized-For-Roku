@@ -24,7 +24,6 @@
         <Chat
             id="chat"
             visible="false"
-            translation="[1600,0]"
             forceLive="false" />
         <TwitchApiTask
             functionName="getTwitchBookmarks"

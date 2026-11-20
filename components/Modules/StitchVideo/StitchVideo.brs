@@ -89,11 +89,15 @@ sub init()
     ' looks like a stutter, even though the seek is working as intended.
     m.suppressLoadingOverlayUntilPlaying = false
 
+    m.chatModeToastGroup = m.top.findNode("chatModeToastGroup")
+    m.chatModeToast = m.top.findNode("chatModeToast")
+
     ' Observers
     m.top.observeField("position", "onPositionChange")
     m.top.observeField("state", "onVideoStateChange")
     m.top.observeField("content", "onContentChange")
     m.top.observeField("chatIsVisible", "onChatVisibilityChange")
+    m.top.observeField("streamLayoutMode", "onStreamLayoutModeChange")
     m.top.observeField("duration", "onDurationChange")
     m.top.observeField("bufferingStatus", "onBufferingStatusChange")
     m.top.observeField("selectedQuality", "onSelectedQualityChange")
@@ -350,11 +354,50 @@ end sub
 
 sub onChatVisibilityChange()
     if m.top.chatIsVisible
-        m.progressBarBase.width = 1480
+        targetWidth = 1480
+        if m.top.width <> invalid and m.top.width > 0
+            targetWidth = m.top.width - 120
+        end if
+        m.progressBarBase.width = targetWidth
     else
         m.progressBarBase.width = 1800
     end if
     updateProgressBar()
+end sub
+
+sub onStreamLayoutModeChange()
+    mode = m.top.streamLayoutMode
+    text = ""
+    if mode = 1
+        text = "Chat: Lateral"
+    else if mode = 2
+        text = "Chat: Superpuesto"
+    else if mode = 0
+        text = "Chat: Oculto"
+    end if
+
+    if text <> ""
+        showChatToast(text)
+    end if
+end sub
+
+sub showChatToast(text as string)
+    if m.chatModeToast <> invalid and m.chatModeToastGroup <> invalid
+        m.chatModeToast.text = text
+        m.chatModeToastGroup.visible = true
+        if m.chatToastTimer = invalid
+            m.chatToastTimer = CreateObject("roSGNode", "Timer")
+            m.chatToastTimer.duration = 2
+            m.chatToastTimer.repeat = false
+            m.chatToastTimer.observeField("fire", "hideChatToast")
+        end if
+        m.chatToastTimer.control = "stop"
+        m.chatToastTimer.control = "start"
+    end if
+end sub
+
+sub hideChatToast()
+    if m.chatModeToastGroup <> invalid then m.chatModeToastGroup.visible = false
 end sub
 
 sub onDurationChange()
@@ -470,7 +513,6 @@ sub executeButtonAction()
         m.top.control = "stop"
     else if m.currentFocusedButton = 1 ' Chat
         m.top.toggleChat = true
-        m.top.streamLayoutMode = (m.top.streamLayoutMode + 1) mod 3
     else if m.currentFocusedButton = 2 ' Play/Pause
         togglePlayPause()
     else if m.currentFocusedButton = 3 ' Quality
@@ -696,10 +738,15 @@ sub onDestroy()
         m.liveEdgeStartupTimer.control = "stop"
         m.liveEdgeStartupTimer.unobserveField("fire")
     end if
+    if m.chatToastTimer <> invalid
+        m.chatToastTimer.control = "stop"
+        m.chatToastTimer.unobserveField("fire")
+    end if
     m.top.unobserveField("position")
     m.top.unobserveField("state")
     m.top.unobserveField("content")
     m.top.unobserveField("chatIsVisible")
+    m.top.unobserveField("streamLayoutMode")
     m.top.unobserveField("duration")
     m.top.unobserveField("bufferingStatus")
     m.top.unobserveField("qualityOptions")

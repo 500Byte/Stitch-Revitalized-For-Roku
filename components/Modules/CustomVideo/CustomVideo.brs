@@ -17,8 +17,12 @@ sub init()
     m.timeDuration = m.top.findNode("timeDuration")
 
     ' Toast elements
+    m.chatModeToastGroup = m.top.findNode("chatModeToastGroup")
     m.chatModeToast = m.top.findNode("chatModeToast")
+    m.muteSkipToastGroup = m.top.findNode("muteSkipToastGroup")
     m.muteSkipToast = m.top.findNode("muteSkipToast")
+    m.skipMuteButton = m.top.findNode("skipMuteButton")
+    m.currentMutedTarget = -1
     m.mutedSegments = invalid
 
     ' Control buttons
@@ -202,30 +206,33 @@ sub onPositionChange()
         updateProgressBar()
     end if
 
-    ' Auto-skip muted audio segments if enabled (like Trubbel / SkipMute)
-    if m.mutedSegments <> invalid and not m.isSeekMode and get_user_setting("AutoSkipMuted", "false") = "true"
+    ' Auto-skip muted audio segments if enabled, or show Skip Mute button (like Netflix "Skip Intro")
+    if m.mutedSegments <> invalid and not m.isSeekMode
         currPos = m.currentPositionSeconds
+        autoSkip = (get_user_setting("AutoSkipMuted", "false") = "true")
+        inMutedSegment = false
+
         for each seg in m.mutedSegments
             if seg.offset <> invalid and seg.duration <> invalid
                 if currPos >= seg.offset and currPos < (seg.offset + seg.duration - 1)
+                    inMutedSegment = true
                     target = seg.offset + seg.duration
-                    m.top.seek = target
-                    if m.muteSkipToast <> invalid
-                        m.muteSkipToast.text = "Saltando audio silenciado..."
-                        m.muteSkipToast.visible = true
-                        if m.muteToastTimer = invalid
-                            m.muteToastTimer = CreateObject("roSGNode", "Timer")
-                            m.muteToastTimer.duration = 3
-                            m.muteToastTimer.repeat = false
-                            m.muteToastTimer.observeField("fire", "hideMuteToast")
-                        end if
-                        m.muteToastTimer.control = "stop"
-                        m.muteToastTimer.control = "start"
+                    if autoSkip
+                        m.top.seek = target
+                        showMuteToast("Saltando audio silenciado...")
+                        hideSkipMuteButton()
+                    else
+                        m.currentMutedTarget = target
+                        showSkipMuteButton()
                     end if
                     exit for
                 end if
             end if
         end for
+
+        if not inMutedSegment
+            hideSkipMuteButton()
+        end if
     end if
 
     ' Auto-save bookmark every 20 seconds (not for live streams)
@@ -278,7 +285,11 @@ end sub
 sub onChatVisibilityChange()
     ' Adjust layout based on chat visibility
     if m.top.chatIsVisible
-        m.progressBarBase.width = 1480
+        targetWidth = 1480
+        if m.top.width <> invalid and m.top.width > 0
+            targetWidth = m.top.width - 120
+        end if
+        m.progressBarBase.width = targetWidth
         m.controlOverlay.translation = [0, 920]
     else
         m.progressBarBase.width = 1800
@@ -288,6 +299,11 @@ sub onChatVisibilityChange()
     ' Update all progress bar elements to match new width
     updateProgressBar()
     renderMutedSegments()
+
+    ' Update skip mute button position if currently visible
+    if m.skipMuteButton <> invalid and m.skipMuteButton.visible
+        showSkipMuteButton()
+    end if
 
     ' Update buffer bar if buffering status is available
     if m.top.bufferingStatus <> invalid
@@ -357,9 +373,15 @@ sub onStreamLayoutModeChange()
         text = "Chat: Oculto"
     end if
 
-    if text <> "" and m.chatModeToast <> invalid
+    if text <> ""
+        showChatToast(text)
+    end if
+end sub
+
+sub showChatToast(text as string)
+    if m.chatModeToast <> invalid and m.chatModeToastGroup <> invalid
         m.chatModeToast.text = text
-        m.chatModeToast.visible = true
+        m.chatModeToastGroup.visible = true
         if m.chatToastTimer = invalid
             m.chatToastTimer = CreateObject("roSGNode", "Timer")
             m.chatToastTimer.duration = 2
@@ -372,11 +394,45 @@ sub onStreamLayoutModeChange()
 end sub
 
 sub hideChatToast()
-    if m.chatModeToast <> invalid then m.chatModeToast.visible = false
+    if m.chatModeToastGroup <> invalid then m.chatModeToastGroup.visible = false
+end sub
+
+sub showMuteToast(text as string)
+    if m.muteSkipToast <> invalid and m.muteSkipToastGroup <> invalid
+        m.muteSkipToast.text = text
+        m.muteSkipToastGroup.visible = true
+        if m.muteToastTimer = invalid
+            m.muteToastTimer = CreateObject("roSGNode", "Timer")
+            m.muteToastTimer.duration = 3
+            m.muteToastTimer.repeat = false
+            m.muteToastTimer.observeField("fire", "hideMuteToast")
+        end if
+        m.muteToastTimer.control = "stop"
+        m.muteToastTimer.control = "start"
+    end if
 end sub
 
 sub hideMuteToast()
-    if m.muteSkipToast <> invalid then m.muteSkipToast.visible = false
+    if m.muteSkipToastGroup <> invalid then m.muteSkipToastGroup.visible = false
+end sub
+
+sub showSkipMuteButton()
+    if m.skipMuteButton = invalid then return
+    btnWidth = 360
+    margin = 50
+    if m.top.width <> invalid and m.top.width > 0 and m.top.chatIsVisible
+        btnX = m.top.width - btnWidth - margin
+    else
+        btnX = 1920 - btnWidth - margin
+    end if
+    m.skipMuteButton.translation = [btnX, 840]
+    m.skipMuteButton.visible = true
+end sub
+
+sub hideSkipMuteButton()
+    if m.skipMuteButton <> invalid
+        m.skipMuteButton.visible = false
+    end if
 end sub
 
 sub onBufferingStatusChange()
@@ -497,7 +553,6 @@ sub executeButtonAction()
             togglePlayPause()
         else if m.currentFocusedButton = 2 ' Chat
             m.top.toggleChat = true
-            m.top.streamLayoutMode = (m.top.streamLayoutMode + 1) mod 3
         end if
     else
         ' VOD/Clips button actions
@@ -519,7 +574,6 @@ sub executeButtonAction()
             seekRelative(10)
         else if m.currentFocusedButton = 5 ' Chat
             m.top.toggleChat = true
-            m.top.streamLayoutMode = (m.top.streamLayoutMode + 1) mod 3
         end if
     end if
 end sub
@@ -921,6 +975,16 @@ function onKeyEvent(key, press) as boolean
 end function
 
 function handleMainKeys(key) as boolean
+    ' Netflix-style Skip Intro/Muted Audio: if the skip button is visible, OK immediately skips past mute
+    if key = "OK" and m.skipMuteButton <> invalid and m.skipMuteButton.visible = true and not m.isOverlayVisible
+        if m.currentMutedTarget <> invalid and m.currentMutedTarget > 0
+            m.top.seek = m.currentMutedTarget
+            hideSkipMuteButton()
+            showMuteToast("Silencio saltado")
+            return true
+        end if
+    end if
+
     if key = "up" or key = "OK" or key = "play"
         if not m.isOverlayVisible
             showOverlay()
@@ -1057,6 +1121,7 @@ sub onDestroy()
     m.top.unobserveField("position")
     m.top.unobserveField("state")
     m.top.unobserveField("chatIsVisible")
+    m.top.unobserveField("streamLayoutMode")
     m.top.unobserveField("duration")
     m.top.unobserveField("bufferingStatus")
     m.top.unobserveField("video_type")

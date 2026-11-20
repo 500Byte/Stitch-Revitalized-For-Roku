@@ -131,5 +131,11 @@
                     fontUri="pkg:/fonts/Archivo-Regular.otf" />
             </LayoutGroup>
         </Group>
+
+        <!-- Chat Mode Toast notification -->
+        <Group id="chatModeToastGroup" translation="[820, 60]" visible="false">
+            <Rectangle id="chatModeToastBg" color="0x000000D0" width="280" height="42" />
+            <SimpleLabel id="chatModeToast" translation="[0, 8]" width="280" horizAlign="center" text="" color="0xFFFFFFFF" fontSize="20" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+        </Group>
     </children>
 </component>
