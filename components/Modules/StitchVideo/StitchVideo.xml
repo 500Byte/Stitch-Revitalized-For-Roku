@@ -45,71 +45,70 @@
     <script type="text/brightscript" uri="pkg:/source/utils/analytics.brs" />
     <children>
         <!-- your existing children stay the same -->
-        <!-- Modern Control Overlay for Live Streams -->
-        <Group id="controlOverlay" translation="[0,920]">
-            <!-- Background Gradient -->
-            <Rectangle width="1920" height="160" color="0x000000E6" />
-            <MaskGroup maskuri="pkg:/images/vertical-mask.png" masksize="[1920,60]" translation="[0,0]">
-                <Rectangle width="1920" height="60" color="0x000000AA" />
-            </MaskGroup>
-            
-            <!-- Progress Bar Section -->
-            <Group translation="[60,5]">
-                <!-- Progress Bar (Full Twitch Purple for Live) -->
-                <Rectangle id="progressBarBase" color="0x3A3A3DFF" width="1800" height="6" translation="[0,65]" />
-                <Rectangle id="progressBarProgress" color="0x9146FFFF" width="1800" height="6" translation="[0,65]" />
-            </Group>
-            
-            <!-- Control Buttons (Live Stream Layout) -->
-            <Group translation="[0,95]">
-                <!-- Back Button (far left) -->
-                <Group id="backGroup" translation="[520,0]" focusable="true">
-                    <Rectangle id="backBg" color="0x404040AA" width="60" height="48" />
-                    <Rectangle id="backFocus" color="0x9146FFFF" width="60" height="48" visible="false" />
-                    <SimpleLabel translation="[21,12]" text="←" color="0xFFFFFFFF" fontSize="22" fontUri="pkg:/fonts/Archivo-Bold.otf" />
-                </Group>
+        <!-- Modern Floating HUD for Live Streams -->
+        <Group id="controlOverlay" visible="false">
+            <!-- Top Scrim Gradient -->
+            <Poster uri="pkg:/images/scrim_top.png" width="1920" height="220" loadDisplayMode="scaleToFit" translation="[0,0]" />
 
-                <!-- Chat Toggle Button -->
-                <Group id="chatGroup" translation="[844,0]">
-                    <Rectangle id="chatBg" color="0x404040AA" width="60" height="48" />
-                    <Rectangle id="chatFocus" color="0x9146FFFF" width="60" height="48" visible="false" />
-                    <Poster id="messagesButton" uri="pkg:/images/messages.png" width="26" height="26" translation="[17,11]" />
-                </Group>
+            <!-- Bottom Scrim Gradient -->
+            <Poster uri="pkg:/images/scrim_bottom.png" width="1920" height="260" loadDisplayMode="scaleToFit" translation="[0,820]" />
 
-                <!-- Play/Pause Button (center between chat and quality) -->
-                <Group id="playPauseGroup" translation="[924,0]" focusable="true">
-                    <Rectangle id="playPauseBg" color="0x404040AA" width="72" height="48" />
-                    <Rectangle id="playPauseFocus" color="0x9146FFFF" width="72" height="48" visible="false" />
-                    <Poster id="controlButton" uri="pkg:/images/pause.png" width="26" height="26" translation="[23,11]" />
-                </Group>
-
-                <!-- Quality Button -->
-                <Group id="qualityGroup" translation="[1016,0]">
-                    <Rectangle id="qualityBg" color="0x404040AA" width="60" height="48" />
-                    <Rectangle id="qualityFocus" color="0x9146FFFF" width="60" height="48" visible="false" />
-                    <Poster id="qualitySelectButton" uri="pkg:/images/icons/sliders.png" width="26" height="26" translation="[17,11]" />
-                </Group>
-            </Group>
-            
-            <!-- Video Info -->
-            <Group translation="[60,10]">
-                <CirclePoster id="avatar" width="44" height="44" translation="[0,0]" />
-                <SimpleLabel id="channelUsername" translation="[56,2]" text="Channel Name" color="0xFFFFFFFF" fontSize="20" fontUri="pkg:/fonts/Archivo-Bold.otf" />
-                <EmojiLabel id="videoTitle" height="24" maxWidth="1000" horizAlign="left" color="0xB3B3B3FF" translation="[56,28]">
+            <!-- Top Floating Header (Channel & Stream Metadata) -->
+            <Group id="topOverlayGroup" translation="[60,48]">
+                <CirclePoster id="avatar" width="48" height="48" translation="[0,0]" />
+                <SimpleLabel id="channelUsername" translation="[62,0]" text="Channel Name" color="0xFFFFFFFF" fontSize="22" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+                <EmojiLabel id="videoTitle" height="24" maxWidth="1100" horizAlign="left" color="0xADADB8FF" translation="[62,26]">
                     <Font role="font" uri="pkg:/fonts/Archivo-Regular.otf" size="16" />
                 </EmojiLabel>
-            </Group>
-            
-            <!-- Live Indicator & Uptime Badge -->
-            <Group id="liveIndicator" translation="[60,40]">
-                <Rectangle id="liveCapsuleBg" color="0x18181BE6" width="220" height="32" />
-                <Group id="liveBadgeGroup" translation="[4, 4]">
-                    <Rectangle id="liveBadgeBg" color="0xEB0400FF" width="76" height="24" />
-                    <SimpleLabel id="liveBadgeText" translation="[8, 3]" text="LIVE" color="0xFFFFFFFF" fontSize="14" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+                
+                <!-- Live Indicator & Uptime Badge (Top Right) -->
+                <Group id="liveIndicator" translation="[1500,6]">
+                    <Rectangle id="liveCapsuleBg" color="0x18181BE6" width="220" height="32" />
+                    <Group id="liveBadgeGroup" translation="[4, 4]">
+                        <Rectangle id="liveBadgeBg" color="0xEB0400FF" width="76" height="24" />
+                        <SimpleLabel id="liveBadgeText" translation="[8, 3]" text="LIVE" color="0xFFFFFFFF" fontSize="14" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+                    </Group>
+                    <SimpleLabel id="uptimeLabel" translation="[88, 6]" text="" color="0xFFFFFFFF" fontSize="16" fontUri="pkg:/fonts/Archivo-Bold.otf" visible="false" />
                 </Group>
-                <SimpleLabel id="uptimeLabel" translation="[88, 6]" text="" color="0xFFFFFFFF" fontSize="16" fontUri="pkg:/fonts/Archivo-Bold.otf" visible="false" />
             </Group>
-            
+
+            <!-- Bottom Floating HUD (Seekbar & Controls) -->
+            <Group id="bottomOverlayGroup" translation="[60,880]">
+                <!-- Progress Bar Section (Full Twitch Purple for Live) -->
+                <Rectangle id="progressBarBase" color="0x3A3A3DFF" width="1800" height="6" translation="[0,24]" />
+                <Rectangle id="progressBarProgress" color="0x9146FFFF" width="1800" height="6" translation="[0,24]" />
+            </Group>
+
+            <!-- Action Capsules Row (Live Stream Layout) -->
+            <Group id="actionControlsGroup" translation="[816,955]">
+                <!-- 0: Back Button -->
+                <Group id="backGroup" translation="[0,0]">
+                    <Poster id="backBg" uri="pkg:/images/capsule.9.png" width="52" height="44" blendColor="0x26262CBB" />
+                    <Poster id="backFocus" uri="pkg:/images/capsule.9.png" width="52" height="44" blendColor="0x9146FFFF" visible="false" />
+                    <Poster uri="pkg:/images/icons/arrow-left.png" width="24" height="24" blendColor="0xFFFFFFFF" translation="[14,10]" />
+                </Group>
+
+                <!-- 1: Chat Toggle Button -->
+                <Group id="chatGroup" translation="[68,0]">
+                    <Poster id="chatBg" uri="pkg:/images/capsule.9.png" width="60" height="44" blendColor="0x26262CBB" />
+                    <Poster id="chatFocus" uri="pkg:/images/capsule.9.png" width="60" height="44" blendColor="0x9146FFFF" visible="false" />
+                    <Poster id="messagesButton" uri="pkg:/images/icons/chat-bubble.png" width="24" height="24" blendColor="0xFFFFFFFF" translation="[18,10]" />
+                </Group>
+
+                <!-- 2: Play/Pause Hero Button -->
+                <Group id="playPauseGroup" translation="[144,-2]">
+                    <Poster id="playPauseBg" uri="pkg:/images/capsule.9.png" width="76" height="48" blendColor="0x3A3A3DEE" />
+                    <Poster id="playPauseFocus" uri="pkg:/images/capsule.9.png" width="76" height="48" blendColor="0x9146FFFF" visible="false" />
+                    <Poster id="controlButton" uri="pkg:/images/icons/pause-hero.png" width="26" height="26" blendColor="0xFFFFFFFF" translation="[25,11]" />
+                </Group>
+
+                <!-- 3: Quality Button -->
+                <Group id="qualityGroup" translation="[236,0]">
+                    <Poster id="qualityBg" uri="pkg:/images/capsule.9.png" width="52" height="44" blendColor="0x26262CBB" />
+                    <Poster id="qualityFocus" uri="pkg:/images/capsule.9.png" width="52" height="44" blendColor="0x9146FFFF" visible="false" />
+                    <Poster id="qualitySelectButton" uri="pkg:/images/icons/settings-gear.png" width="24" height="24" blendColor="0xFFFFFFFF" translation="[14,10]" />
+                </Group>
+            </Group>
 
         </Group>
         

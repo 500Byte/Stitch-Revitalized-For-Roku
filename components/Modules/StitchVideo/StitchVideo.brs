@@ -28,6 +28,9 @@ sub init()
 
     ' Other elements
     m.liveIndicator = m.top.findNode("liveIndicator")
+    m.topOverlayGroup = m.top.findNode("topOverlayGroup")
+    m.bottomOverlayGroup = m.top.findNode("bottomOverlayGroup")
+    m.actionControlsGroup = m.top.findNode("actionControlsGroup")
 
     ' Video info
     m.videoTitle = m.top.findNode("videoTitle")
@@ -185,7 +188,7 @@ end sub
 sub onVideoStateChange()
     ? getLogTimestamp(); " [StitchVideo][state] state="; m.top.state; " pos="; m.top.position
     if m.top.state = "playing"
-        m.controlButton.uri = "pkg:/images/pause.png"
+        m.controlButton.uri = "pkg:/images/icons/pause-hero.png"
         hideLoadingOverlay()
         ' Reaching "playing" ends any post-seek re-buffer; re-enable the
         ' loading overlay for future, non-seek-related buffering events.
@@ -207,7 +210,7 @@ sub onVideoStateChange()
             startLiveEdgeStartupTimer()
         end if
     else if m.top.state = "paused"
-        m.controlButton.uri = "pkg:/images/play.png"
+        m.controlButton.uri = "pkg:/images/icons/play-hero.png"
         hideLoadingOverlay()
         stopLatencyLog()
         stopLiveEdgeStartupTimer()
@@ -359,16 +362,41 @@ sub issueLiveEdgeSeek(reason as string)
 end sub
 
 sub onChatVisibilityChange()
+    chatW = 400
+    if m.global.constants <> invalid and m.global.constants.chatWidth <> invalid and m.global.constants.chatWidth > 0
+        chatW = m.global.constants.chatWidth
+    end if
+
     if m.top.chatIsVisible
-        targetWidth = 1480
-        if m.top.width <> invalid and m.top.width > 0
-            targetWidth = m.top.width - 120
-        end if
+        targetWidth = 1800 - chatW
+        if targetWidth < 1200 then targetWidth = 1200
         m.progressBarBase.width = targetWidth
-        if m.liveIndicator <> invalid then m.liveIndicator.translation = [1180, 15]
+        m.progressBarProgress.width = targetWidth
+
+        buttonsW = 288
+        newButtonsX = Int((1920 - chatW - buttonsW) / 2)
+        if newButtonsX < 60 then newButtonsX = 60
+        if m.actionControlsGroup <> invalid
+            m.actionControlsGroup.translation = [newButtonsX, 955]
+        end if
+        if m.videoTitle <> invalid
+            m.videoTitle.maxWidth = targetWidth - 200
+        end if
+        if m.liveIndicator <> invalid
+            m.liveIndicator.translation = [1080, 6]
+        end if
     else
         m.progressBarBase.width = 1800
-        if m.liveIndicator <> invalid then m.liveIndicator.translation = [1620, 15]
+        m.progressBarProgress.width = 1800
+        if m.actionControlsGroup <> invalid
+            m.actionControlsGroup.translation = [816, 955]
+        end if
+        if m.videoTitle <> invalid
+            m.videoTitle.maxWidth = 1100
+        end if
+        if m.liveIndicator <> invalid
+            m.liveIndicator.translation = [1500, 6]
+        end if
     end if
     updateProgressBar()
 end sub
