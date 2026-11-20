@@ -5,9 +5,11 @@ sub init()
 
     m.userLocation = []
 
-    m.categoryList = m.top.findNode("categoryList")
+    m.settingsHeader = m.top.findNode("settingsHeader")
     m.settingsMenu = m.top.findNode("settingsMenu")
-    m.settingsMenu.focusedColor = m.global.constants.colors.white
+    if m.global <> invalid and m.global.constants <> invalid
+        m.settingsMenu.focusedColor = m.global.constants.colors.white
+    end if
 
     m.settingDetail = m.top.findNode("settingDetail")
     m.settingDesc = m.top.findNode("settingDesc")
@@ -20,13 +22,8 @@ sub init()
     m.healthCheckTask = invalid
     m.pendingProxySave = invalid
 
-    ' Derive numRows from screen resolution so scrolling works on any Roku
-    ' itemSize height=50, itemSpacing=5 → 55px per row
-    ' Available: screenHeight - 96 (scene y offset) - 20 (list y offset) - 48 (bottom margin)
-    screenHeight = m.top.getScene().currentDesignResolution.height
-    m.settingsMenu.numRows = Int((screenHeight - 96 - 20 - 48) / 55)
-
-    m.categoryList.setFocus(true)
+    m.settingsMenu.numRows = 12
+    m.settingsMenu.setFocus(true)
 
     m.settingsMenu.observeField("itemFocused", "settingFocused")
     m.settingsMenu.observeField("itemSelected", "settingSelected")
@@ -76,6 +73,14 @@ sub LoadMenu(configSection)
     end for
 
     m.settingsMenu.content = result
+
+    if m.settingsHeader <> invalid
+        if m.userLocation.Count() <= 1 or configSection.title = invalid
+            m.settingsHeader.text = tr("Settings")
+        else
+            m.settingsHeader.text = tr("Settings") + "  ›  " + tr(configSection.title)
+        end if
+    end if
 
     if configSection.selectedIndex <> invalid and configSection.selectedIndex > -1
         m.settingsMenu.jumpToItem = configSection.selectedIndex
@@ -137,7 +142,7 @@ sub placeBelowDescription(node as object, extra = 0 as integer)
         descY = m.settingDetail.translation[1] + m.settingTitle.boundingRect().height + m.settingDesc.boundingRect().height
     catch e
     end try
-    node.translation = [930, descY + 40 + extra]
+    node.translation = [924, descY + 64 + extra]
 end sub
 
 sub settingSelected()
@@ -317,10 +322,8 @@ sub performLogout()
         NukeRegistry(active_user)
         set_setting("active_user", "$default$")
     else
-        for each key in getRegistryKeys("$default$")
-            if key <> "temp_device_code" and key <> "device_code"
-                unset_user_setting(key)
-            end if
+        for each key in ["access_token", "refresh_token", "login", "id", "display_name", "profile_image_url"]
+            unset_user_setting(key)
         end for
     end if
     m.top.finished = true

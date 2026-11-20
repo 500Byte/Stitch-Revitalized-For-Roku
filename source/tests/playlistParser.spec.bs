@@ -1,0 +1,59 @@
+namespace tests
+
+    @suite("Playlist parser helpers")
+    class PlaylistParserTests extends rooibos.BaseTestSuite
+
+        @describe("parseMasterPlaylist")
+
+        @it("parses variants and keeps comma-separated CODECS intact")
+        sub parsesVariants()
+            m3u8 = "#EXTM3U" + chr(10)
+            m3u8 += "#EXT-X-STREAM-INF:BANDWIDTH=6000000,RESOLUTION=1920x1080,CODECS=" + chr(34) + "avc1.64002a,mp4a.40.2" + chr(34) + ",VIDEO=" + chr(34) + "chunked" + chr(34) + chr(10)
+            m3u8 += "https://edge/v1/1080.m3u8" + chr(10)
+            m3u8 += "#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360,VIDEO=" + chr(34) + "360p30" + chr(34) + chr(10)
+            m3u8 += "https://edge/v1/360.m3u8"
+
+            parsed = parseMasterPlaylist(m3u8)
+            m.assertEqual(parsed.count(), 2)
+            m.assertEqual(parsed[0]["CODECS"], "avc1.64002a,mp4a.40.2")
+            m.assertEqual(parsed[0]["URL"], "https://edge/v1/1080.m3u8")
+            m.assertEqual(parsed[1]["RESOLUTION"], "640x360")
+            m.assertEqual(parsed[1]["URL"], "https://edge/v1/360.m3u8")
+        end sub
+
+        @it("returns empty array for empty or tag-less input")
+        sub emptyMaster()
+            m.assertEqual(parseMasterPlaylist("").count(), 0)
+            m.assertEqual(parseMasterPlaylist("#EXTM3U").count(), 0)
+        end sub
+
+        @describe("buildProxyM3u8Url")
+
+        @it("encodes upstream url and appends non-empty variant hints")
+        sub buildsUrl()
+            url = buildProxyM3u8Url("http://127.0.0.1:5757", "https://edge/a.m3u8?x=1", {
+                codecs: "hvc1.1,mp4a.40.2",
+                bandwidth: "6000000",
+                resolution: "1920x1080"
+            })
+            m.assertTrue(url.InStr("http://127.0.0.1:5757/m3u8?u=") = 0)
+            m.assertTrue(url.InStr("&codecs=hvc1.1%2Cmp4a.40.2") > -1)
+            m.assertTrue(url.InStr("&bw=6000000") > -1)
+            m.assertTrue(url.InStr("&res=1920x1080") > -1)
+            m.assertEqual(buildProxyM3u8Url("http://127.0.0.1:5757", "https://edge/a.m3u8", invalid), "http://127.0.0.1:5757/m3u8?u=https%3A%2F%2Fedge%2Fa.m3u8")
+        end sub
+
+        @describe("generateClipFallbackUrls")
+
+        @it("prepends UUID patterns when previewImageUrl matches clips-thumbnails-prod")
+        sub clipUrls()
+            withUuid = generateClipFallbackUrls("Slug1", "https://static-cdn.jtvnw.net/twitch-clips-thumbnails-prod/Slug1/abc-uuid/preview.jpg")
+            m.assertEqual(withUuid[0], "https://production.assets.clips.twitchcdn.net/v2/media/Slug1/abc-uuid/video.mp4")
+
+            withoutUuid = generateClipFallbackUrls("Slug1", "")
+            m.assertEqual(withoutUuid[0], "https://clips-media-assets2.twitch.tv/Slug1.mp4")
+        end sub
+
+    end class
+
+end namespace

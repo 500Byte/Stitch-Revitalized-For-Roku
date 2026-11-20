@@ -4,11 +4,36 @@
     <Rectangle
       visible="true"
       id="headerRect"
-      color="0x26262cFF"
+      color="0x121215FF"
       width="1920"
-      height="64"
+      height="80"
       translation="[0, 0]"
     />
+    <Rectangle
+      id="headerBottomBorder"
+      color="0x26262CFF"
+      width="1920"
+      height="1"
+      translation="[0, 80]"
+    />
+    <Group id="brandBadge" translation="[20, 21]">
+      <Poster
+        uri="pkg:/images/capsule.9.png"
+        width="38"
+        height="38"
+        blendColor="0x9146FFFF"
+      />
+      <Label
+        width="38"
+        height="38"
+        horizAlign="center"
+        vertAlign="center"
+        text="S"
+        color="0xFFFFFFFF"
+      >
+        <Font role="font" uri="pkg:/fonts/Archivo-Bold.otf" size="22" />
+      </Label>
+    </Group>
 
     <ButtonGroupHoriz id="MenuOptions" layoutDirection="horiz" horizAlignment="left" />
     <ButtonGroupHoriz id="IconOptions" layoutDirection="horiz" horizAlignment="left" />
@@ -22,21 +47,22 @@
       value="[]"
       onChange="updateMenuOptions"
     />
-    <field id="menuTextColor" type="color" value="0xEFEFF1FF" />
-    <field id="menuFocusColor" type="color" value="0x9146FFCC" />
+    <field id="menuTextColor" type="color" value="0xADADB8FF" />
+    <field id="menuFocusColor" type="color" value="0xFFFFFFFF" />
     <field id="menuOptionsSpacing" type="int" value="0" />
     <field
       id="menuOptionsTranslation"
       type="vector2d"
-      value="[15,0]"
+      value="[104,8]"
       alias="MenuOptions.translation"
     />
-    <field id="menuFontSize" type="int" value="22" />
+    <field id="menuFontSize" type="int" value="24" />
     <field id="menuFontUri" type="uri" value="pkg:/fonts/Archivo-Bold.otf" />
     <field id="showSearchIcon" type="bool" value="true" onChange="updateMenuOptions" />
     <field id="showSettingsIcon" type="bool" value="true" onChange="updateMenuOptions" />
     <field id="showLoginIcon" type="bool" value="true" onChange="updateMenuOptions" />
     <field id="updateUserIcon" type="bool" value="false" />
+    <function name="onDestroy" />
   </interface>
   <script type="text/brightscript" uri="MenuBar.brs" />
   <script type="text/brightscript" uri="pkg:/source/utils/misc.brs" />

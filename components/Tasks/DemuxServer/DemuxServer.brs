@@ -207,7 +207,6 @@ function startDownload(url as string, file as string, job as object) as boolean
     x.SetMessagePort(m.port)
     x.SetUrl(url)
     x.SetCertificatesFile("common:/certs/ca-bundle.crt")
-    x.InitClientCertificates()
     x.EnableEncodings(true)
     x.RetainBodyOnError(true)
     if job.ua = invalid

@@ -9,7 +9,7 @@ sub init()
     m.errorHistory = []
     m.bufferStallCount = 0
     m.maxBufferStalls = 5
-    m.bufferStallTimeout = 10000 ' 10 seconds
+    m.bufferStallTimeout = 10 ' seconds (matches roDateTime.AsSeconds())
     m.lastBufferTime = 0
 
     ' Error recovery strategies
@@ -180,29 +180,12 @@ function calculateBackoffDelay() as integer
     return delay
 end function
 
-function getNextLowerQuality(video as object) as object
-    if video.qualityOptions = invalid or video.qualityOptions.count() = 0
-        return invalid
-    end if
-
-    currentQuality = video.selectedQuality
-    if currentQuality = invalid
-        return invalid
-    end if
-
-    ' Find current quality index
-    currentIndex = -1
-    for i = 0 to video.qualityOptions.count() - 1
-        if video.qualityOptions[i] = currentQuality
-            currentIndex = i
-            exit for
-        end if
-    end for
-
-    ' Get next lower quality (higher index typically means lower quality)
-    if currentIndex >= 0 and currentIndex < video.qualityOptions.count() - 1
+function getNextLowerQuality(video as object) as dynamic
+    nextIndex = getNextLowerQualityIndex(video.qualityOptions, video.selectedQuality)
+    if nextIndex >= 0
         return {
-            qualityID: video.qualityOptions[currentIndex + 1],
+            qualityIndex: nextIndex,
+            qualityID: video.qualityOptions[nextIndex],
             isLowerQuality: true
         }
     end if
@@ -210,17 +193,12 @@ function getNextLowerQuality(video as object) as object
     return invalid
 end function
 
-function getAlternativeQuality(video as object, contentRequested as object) as object
-    if video.qualityOptions = invalid or video.qualityOptions.count() = 0
-        return invalid
-    end if
-
-    ' Try to find a mid-range quality as alternative
-    qualityCount = video.qualityOptions.count()
-    if qualityCount > 2
-        midIndex = Int(qualityCount / 2)
+function getAlternativeQuality(video as object, contentRequested as object) as dynamic
+    altIndex = getAlternativeQualityIndex(video.qualityOptions)
+    if altIndex >= 0
         return {
-            qualityID: video.qualityOptions[midIndex],
+            qualityIndex: altIndex,
+            qualityID: video.qualityOptions[altIndex],
             isAlternative: true
         }
     end if

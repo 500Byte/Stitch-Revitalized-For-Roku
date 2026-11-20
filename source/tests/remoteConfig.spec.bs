@@ -50,10 +50,13 @@ namespace tests
 
         @it("remoteFlag returns the default when the config is missing")
         sub flagDefault()
-            m.global = { remoteConfig: {} }
+            g = GetGlobalAA()
+            prev = g.global
+            g.global = { remoteConfig: {} }
             m.assertTrue(remoteFlag("adFix", true))
-            m.global = { remoteConfig: { adFix: false } }
+            g.global = { remoteConfig: { adFix: false } }
             m.assertFalse(remoteFlag("adFix", true))
+            g.global = prev
         end sub
 
     end class

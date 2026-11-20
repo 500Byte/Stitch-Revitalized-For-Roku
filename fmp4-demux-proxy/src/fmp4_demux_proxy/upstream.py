@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from typing import Final
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import aiohttp
 from aiohttp import web
@@ -17,6 +17,7 @@ SESSION_KEY: Final[web.AppKey[aiohttp.ClientSession]] = web.AppKey(
 CONFIG_KEY: Final[web.AppKey[Config]] = web.AppKey("config", Config)
 
 _ALLOWED_SCHEMES: Final[frozenset[str]] = frozenset({"http", "https"})
+_REDIRECT_STATUSES: Final[frozenset[int]] = frozenset({301, 302, 303, 307, 308})
 
 
 async def upstream_session_cleanup_ctx(app: web.Application) -> AsyncIterator[None]:
@@ -65,3 +66,47 @@ def validate_upstream_url(url: str, allowlist: tuple[str, ...]) -> None:
             return
 
     raise web.HTTPBadRequest(text=f"disallowed upstream host: {host}")
+
+
+async def fetch_upstream(
+    session: aiohttp.ClientSession,
+    url: str,
+    allowlist: tuple[str, ...],
+    *,
+    max_redirects: int = 5,
+    max_bytes: int | None = None,
+) -> tuple[int, str, bytes]:
+    """Fetch ``url``, validating every redirect target and bounding response size."""
+    current = url
+    validate_upstream_url(current, allowlist)
+    for _ in range(max_redirects + 1):
+        async with session.get(current, allow_redirects=False) as resp:
+            if resp.status in _REDIRECT_STATUSES:
+                location = resp.headers.get("Location")
+                if not location:
+                    return resp.status, str(resp.url), await _read_bounded(resp, max_bytes)
+                next_url = urljoin(current, location)
+                validate_upstream_url(next_url, allowlist)
+                current = next_url
+                continue
+            body = await _read_bounded(resp, max_bytes)
+            return resp.status, str(resp.url), body
+    raise web.HTTPBadGateway(text="too many upstream redirects")
+
+
+async def _read_bounded(resp: aiohttp.ClientResponse, max_bytes: int | None) -> bytes:
+    if max_bytes is None:
+        return await resp.read()
+    cl_header = resp.headers.get("Content-Length")
+    if cl_header is not None:
+        try:
+            if int(cl_header) > max_bytes:
+                raise web.HTTPBadGateway(text="upstream response too large")
+        except ValueError:
+            pass
+    buf = bytearray()
+    async for chunk in resp.content.iter_chunked(65536):
+        buf.extend(chunk)
+        if len(buf) > max_bytes:
+            raise web.HTTPBadGateway(text="upstream response too large")
+    return bytes(buf)

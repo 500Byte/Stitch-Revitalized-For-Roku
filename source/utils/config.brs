@@ -1,8 +1,11 @@
 ' "Registry" is where Roku stores config
 
-' Read config tree from json config file and return
+' Read config tree from json config file and cache per component/task scope
 function GetConfigTree()
-    return ParseJSON(ReadAsciiFile("pkg:/settings/settings.json"))
+    if m._configTree = invalid
+        m._configTree = ParseJSON(ReadAsciiFile("pkg:/settings/settings.json"))
+    end if
+    return m._configTree
 end function
 
 
@@ -47,8 +50,9 @@ end sub
 
 ' User registry accessors for the currently active user
 function get_user_setting(key, default = invalid)
-    if get_setting("active_user") = invalid then return default
-    value = registry_read(key, get_setting("active_user"))
+    activeUser = get_setting("active_user")
+    if activeUser = invalid then return default
+    value = registry_read(key, activeUser)
     if value = invalid
 
         ' Check for default in Config Tree
@@ -56,7 +60,7 @@ function get_user_setting(key, default = invalid)
         configKey = findConfigTreeKey(key, configTree)
 
         if configKey <> invalid and configKey.default <> invalid
-            set_user_setting(key, configKey.default) ' Set user setting to default
+            registry_write(key, configKey.default, activeUser) ' Set user setting to default
             return configKey.default
         end if
 
@@ -88,32 +92,6 @@ function findConfigTreeKey(key as string, tree)
     end for
 
     return invalid
-end function
-
-' Added for backwards compatibility
-
-function getTokenFromRegistry()
-    return {
-        access_token: get_user_setting("access_token", ""),
-        refresh_token: get_user_setting("refresh_token", ""),
-        login: get_user_setting("login", ""),
-        device_id: get_user_setting("device_code", "")
-    }
-end function
-
-function getRegistryKeys(section = invalid)
-    Registry = CreateObject("roRegistry")
-    if section = invalid
-        output = {}
-        for each section in Registry.GetSectionList()
-            RegistrySection = CreateObject("roRegistrySection", section)
-            output[section] = RegistrySection.GetKeyList()
-        end for
-    else
-        RegistrySection = CreateObject("roRegistrySection", section)
-        output = RegistrySection.GetKeyList()
-    end if
-    return output
 end function
 
 sub NukeRegistry(section = invalid)

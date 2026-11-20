@@ -19,10 +19,17 @@
         <field id="currentProgressBarState" type="Integer" value="1" />
         <field id="video_id" type="string" />
         <field id="video_type" type="string" />
+        <field id="streamCreatedAt" type="string" />
+        <field id="qualityOptions" type="array" />
+        <field id="selectedQuality" type="string" />
+        <field id="chatWidth" type="Integer" value="420" />
+        <function name="onDestroy" />
     </interface>
     <script type="text/brightscript" uri="CustomVideo.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/config.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/misc.brs" />
+    <script type="text/brightscript" uri="pkg:/source/utils/taskFactory.brs" />
+    <script type="text/brightscript" uri="pkg:/source/utils/playerHud.brs" />
     <children>
         <!-- Modern Time Travel Dialog -->
         <Group id="timeTravelDialog" visible="false" translation="[660,360]">
@@ -164,89 +171,106 @@
             </Group>
         </Group>
 
-        <!-- Modern Control Overlay -->
-        <Group id="controlOverlay" translation="[0,920]">
-            <!-- Background Gradient -->
-            <Rectangle width="1920" height="160" color="0x000000E6" />
-            <MaskGroup maskuri="pkg:/images/vertical-mask.png" masksize="[1920,60]" translation="[0,0]">
-                <Rectangle width="1920" height="60" color="0x000000AA" />
-            </MaskGroup>
-            
-            <!-- Progress Bar Section -->
-            <Group translation="[60,5]">
-                <SimpleLabel id="timeProgress" fontUri="pkg:/fonts/Archivo-Regular.otf" fontSize="16" color="0xFFFFFFFF" translation="[0,45]" />
-                <SimpleLabel id="timeDuration" fontUri="pkg:/fonts/Archivo-Regular.otf" fontSize="16" color="0xFFFFFFFF" translation="[1740,45]" />
+        <!-- Modern Floating HUD (Dual-Zone with Scrims - Punto Medio LG + Apple TV) -->
+        <Group id="controlOverlay" visible="false">
+            <!-- Top Scrim Gradient -->
+            <Poster id="scrimTop" uri="pkg:/images/scrim_top.png" width="1920" height="180" loadDisplayMode="scaleToFit" translation="[0,0]" />
+
+            <!-- Bottom Scrim Gradient (Cinema Contrast) -->
+            <Poster id="scrimBottom" uri="pkg:/images/scrim_bottom.png" width="1920" height="340" loadDisplayMode="scaleToFit" translation="[0,740]" />
+
+            <!-- Top Floating Header (Live Indicator & Status) -->
+            <Group id="topOverlayGroup" translation="[0,48]">
+                <!-- Live Indicator & Uptime Badge (Top Right) -->
+                <Group id="liveIndicator" translation="[1630,0]" visible="false">
+                    <Rectangle id="liveCapsuleBg" color="0x18181BE6" width="220" height="36" />
+                    <Group id="liveBadgeGroup" translation="[4, 4]">
+                        <Rectangle id="liveBadgeBg" color="0xEB0400FF" width="76" height="28" />
+                        <SimpleLabel id="liveBadgeText" translation="[8, 4]" text="LIVE" color="0xFFFFFFFF" fontSize="16" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+                    </Group>
+                    <SimpleLabel id="uptimeLabel" translation="[88, 7]" text="" color="0xFFFFFFFF" fontSize="18" fontUri="pkg:/fonts/Archivo-Bold.otf" visible="false" />
+                </Group>
+            </Group>
+
+            <!-- Bottom Floating HUD: Seekbar & Timestamps -->
+            <Group id="bottomOverlayGroup" translation="[70,835]">
+                <!-- Time Displays -->
+                <SimpleLabel id="timeProgress" fontUri="pkg:/fonts/Archivo-Bold.otf" fontSize="18" color="0xFFFFFFFF" translation="[0,-2]" />
+                <Label id="timeDuration" color="0xADADB8FF" translation="[1680,-2]" width="100" horizAlign="right">
+                    <Font role="font" uri="pkg:/fonts/Archivo-Bold.otf" size="18" />
+                </Label>
                 
                 <!-- Progress Bar -->
-                <Rectangle id="progressBarBase" color="0x404040FF" width="1800" height="4"  translation="[0,65]" />
-                <Rectangle id="progressBarBuffer" color="0x606060FF" width="0" height="4"  translation="[0,65]" />
-                <Rectangle id="progressBarProgress" color="0x9146FFFF" width="0" height="4"  translation="[0,65]" />
+                <Rectangle id="progressBarBase" color="0x3A3A3DFF" width="1780" height="8"  translation="[0,26]" />
+                <Rectangle id="progressBarBuffer" color="0x53535FFF" width="0" height="8"  translation="[0,26]" />
+                <Rectangle id="progressBarProgress" color="0x9146FFFF" width="0" height="8"  translation="[0,26]" />
+                <Group id="mutedSegmentsGroup" translation="[0,26]" />
                 
                 <!-- Progress Dot -->
-                <Group id="progressDot" translation="[0,59]">
-                    <Rectangle color="0x9146FFFF" width="16" height="16"  />
-                    <Rectangle color="0xFFFFFFFF" width="8" height="8"  translation="[4,4]" />
+                <Group id="progressDot" translation="[0,19]">
+                    <Rectangle color="0x9146FFFF" width="22" height="22" />
+                    <Rectangle color="0xFFFFFFFF" width="10" height="10" translation="[6,6]" />
                 </Group>
             </Group>
-            
-            <!-- Control Buttons -->
-            <Group translation="[0,95]">
-                <!-- Back Button (far left) -->
-                <Group id="backGroup" translation="[520,0]" focusable="true">
-                    <Rectangle id="backBg" color="0x404040AA" width="60" height="48" />
-                    <Rectangle id="backFocus" color="0x9146FFFF" width="60" height="48" visible="false" />
-                    <SimpleLabel translation="[21,12]" text="←" color="0xFFFFFFFF" fontSize="22" fontUri="pkg:/fonts/Archivo-Bold.otf" />
-                </Group>
 
-                <!-- Time Travel Button -->
-                <Group id="timeTravelGroup" translation="[764,0]" focusable="true">
-                    <Rectangle id="timeTravelBg" color="0x404040AA" width="60" height="48" />
-                    <Rectangle id="timeTravelFocus" color="0x9146FFFF" width="60" height="48" visible="false" />
-                    <Poster uri="pkg:/images/TimeTravel.png" width="26" height="26" translation="[17,11]" />
-                </Group>
-
-                <!-- Rewind Button -->
-                <Group id="rewindGroup" translation="[844,0]">
-                    <Rectangle id="rewindBg" color="0x404040AA" width="60" height="48" />
-                    <Rectangle id="rewindFocus" color="0x9146FFFF" width="60" height="48" visible="false" />
-                    <SimpleLabel translation="[14,13]" text="−10" color="0xFFFFFFFF" fontSize="18" fontUri="pkg:/fonts/Archivo-Bold.otf" />
-                </Group>
-
-                <!-- Play/Pause Button (centered) -->
-                <Group id="playPauseGroup" translation="[924,0]">
-                    <Rectangle id="playPauseBg" color="0x404040AA" width="72" height="48" />
-                    <Rectangle id="playPauseFocus" color="0x9146FFFF" width="72" height="48" visible="false" />
-                    <Poster id="controlButton" uri="pkg:/images/pause.png" width="26" height="26" translation="[23,11]" />
-                </Group>
-
-                <!-- Fast Forward Button -->
-                <Group id="fastForwardGroup" translation="[1016,0]">
-                    <Rectangle id="fastForwardBg" color="0x404040AA" width="60" height="48" />
-                    <Rectangle id="fastForwardFocus" color="0x9146FFFF" width="60" height="48" visible="false" />
-                    <SimpleLabel translation="[14,13]" text="+10" color="0xFFFFFFFF" fontSize="18" fontUri="pkg:/fonts/Archivo-Bold.otf" />
-                </Group>
-
-                <!-- Chat Toggle Button -->
-                <Group id="chatGroup" translation="[1096,0]">
-                    <Rectangle id="chatBg" color="0x404040AA" width="60" height="48" />
-                    <Rectangle id="chatFocus" color="0x9146FFFF" width="60" height="48" visible="false" />
-                    <Poster uri="pkg:/images/messages.png" width="26" height="26" translation="[17,11]" />
-                </Group>
-            </Group>
-            
-            <!-- Video Info -->
-            <Group translation="[60,10]">
-                <CirclePoster id="avatar" width="44" height="44" translation="[0,0]" />
-                <SimpleLabel id="channelUsername" translation="[56,2]" text="Channel Name" color="0xFFFFFFFF" fontSize="20" fontUri="pkg:/fonts/Archivo-Bold.otf" />
-                <EmojiLabel id="videoTitle" height="24" maxWidth="1000" horizAlign="left" color="0xB3B3B3FF" translation="[56,28]">
+            <!-- Bottom Left: Channel & Stream Metadata (LG TV Anchor) -->
+            <Group id="channelInfoGroup" translation="[70,892]">
+                <CirclePoster id="avatar" width="60" height="60" translation="[0,0]" />
+                <SimpleLabel id="channelUsername" translation="[76,4]" text="Channel Name" color="0xFFFFFFFF" fontSize="22" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+                <EmojiLabel id="videoTitle" height="28" maxWidth="1150" horizAlign="left" color="0xADADB8FF" translation="[76,34]">
                     <Font role="font" uri="pkg:/fonts/Archivo-Regular.otf" size="16" />
                 </EmojiLabel>
             </Group>
-            
-            <!-- Live Indicator -->
-            <Group id="liveIndicator" translation="[1740,15]" visible="false">
-                <Rectangle color="0xFF0000FF" width="60" height="24" />
-                <SimpleLabel translation="[12,3]" text="LIVE" color="0xFFFFFFFF" fontSize="16" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+
+            <!-- Bottom Right: Action Capsules Row (Apple TV Pills) -->
+            <Group id="actionControlsGroup" translation="[1336,890]">
+                <!-- Hidden Back Button (node preserved for backwards compatibility) -->
+                <Group id="backGroup" visible="false">
+                    <Poster id="backBg" uri="pkg:/images/capsule.9.png" width="64" height="56" blendColor="0x26262CBB" />
+                    <Poster id="backFocus" uri="pkg:/images/capsule.9.png" width="64" height="56" blendColor="0x9146FFFF" visible="false" />
+                </Group>
+
+                <!-- 0: Rewind Button (-10s) -->
+                <Group id="rewindGroup" translation="[0,4]">
+                    <Poster id="rewindBg" uri="pkg:/images/capsule.9.png" width="76" height="56" blendColor="0x26262CBB" />
+                    <Poster id="rewindFocus" uri="pkg:/images/capsule.9.png" width="76" height="56" blendColor="0x9146FFFF" visible="false" />
+                    <Poster uri="pkg:/images/icons/rotate-ccw-10.png" width="32" height="32" blendColor="0xFFFFFFFF" translation="[22,12]" />
+                </Group>
+
+                <!-- 1: Play/Pause Hero Button -->
+                <Group id="playPauseGroup" translation="[88,0]">
+                    <Poster id="playPauseBg" uri="pkg:/images/capsule.9.png" width="92" height="64" blendColor="0x3A3A3DEE" />
+                    <Poster id="playPauseFocus" uri="pkg:/images/capsule.9.png" width="92" height="64" blendColor="0x9146FFFF" visible="false" />
+                    <Poster id="controlButton" uri="pkg:/images/icons/pause-hero.png" width="36" height="36" blendColor="0xFFFFFFFF" translation="[28,14]" />
+                </Group>
+
+                <!-- 2: Fast Forward Button (+10s) -->
+                <Group id="fastForwardGroup" translation="[192,4]">
+                    <Poster id="fastForwardBg" uri="pkg:/images/capsule.9.png" width="76" height="56" blendColor="0x26262CBB" />
+                    <Poster id="fastForwardFocus" uri="pkg:/images/capsule.9.png" width="76" height="56" blendColor="0x9146FFFF" visible="false" />
+                    <Poster uri="pkg:/images/icons/rotate-cw-10.png" width="32" height="32" blendColor="0xFFFFFFFF" translation="[22,12]" />
+                </Group>
+
+                <!-- 3: Time Travel Button -->
+                <Group id="timeTravelGroup" translation="[290,4]">
+                    <Poster id="timeTravelBg" uri="pkg:/images/capsule.9.png" width="64" height="56" blendColor="0x26262CBB" />
+                    <Poster id="timeTravelFocus" uri="pkg:/images/capsule.9.png" width="64" height="56" blendColor="0x9146FFFF" visible="false" />
+                    <Poster uri="pkg:/images/icons/time-travel.png" width="30" height="30" blendColor="0xFFFFFFFF" translation="[17,13]" />
+                </Group>
+
+                <!-- 4: Chat Toggle Button -->
+                <Group id="chatGroup" translation="[366,4]">
+                    <Poster id="chatBg" uri="pkg:/images/capsule.9.png" width="72" height="56" blendColor="0x26262CBB" />
+                    <Poster id="chatFocus" uri="pkg:/images/capsule.9.png" width="72" height="56" blendColor="0x9146FFFF" visible="false" />
+                    <Poster uri="pkg:/images/icons/chat-bubble.png" width="30" height="30" blendColor="0xFFFFFFFF" translation="[21,13]" />
+                </Group>
+
+                <!-- 5: Settings Gear Button -->
+                <Group id="settingsGroup" translation="[450,4]">
+                    <Poster id="settingsBg" uri="pkg:/images/capsule.9.png" width="64" height="56" blendColor="0x26262CBB" />
+                    <Poster id="settingsFocus" uri="pkg:/images/capsule.9.png" width="64" height="56" blendColor="0x9146FFFF" visible="false" />
+                    <Poster uri="pkg:/images/icons/settings-gear.png" width="30" height="30" blendColor="0xFFFFFFFF" translation="[17,13]" />
+                </Group>
             </Group>
             
         </Group>
@@ -284,5 +308,36 @@
                     fontUri="pkg:/fonts/Archivo-Regular.otf" />
             </LayoutGroup>
         </Group>
+
+        <!-- Toast notifications (outside controlOverlay so they display even when controls are hidden) -->
+        <Group id="chatModeToastGroup" translation="[820, 60]" visible="false">
+            <Rectangle id="chatModeToastBg" color="0x000000D0" width="280" height="42" />
+            <Label id="chatModeToast" translation="[0, 8]" width="280" horizAlign="center" text="" color="0xFFFFFFFF">
+                <Font role="font" uri="pkg:/fonts/Archivo-Bold.otf" size="20" />
+            </Label>
+        </Group>
+
+        <Group id="muteSkipToastGroup" translation="[760, 60]" visible="false">
+            <Rectangle id="muteSkipToastBg" color="0xE91E63E6" width="400" height="42" />
+            <Label id="muteSkipToast" translation="[0, 8]" width="400" horizAlign="center" text="" color="0xFFFFFFFF">
+                <Font role="font" uri="pkg:/fonts/Archivo-Bold.otf" size="18" />
+            </Label>
+        </Group>
+
+        <!-- Netflix-style Skip Muted Audio Button -->
+        <Group id="skipMuteButton" translation="[1480, 840]" visible="false">
+            <Rectangle id="skipMuteBg" color="0x18181BF0" width="360" height="52" />
+            <Rectangle id="skipMuteAccent" color="0xE91E63FF" width="6" height="52" />
+            <!-- [OK] badge -->
+            <Rectangle color="0xE91E63FF" width="48" height="30" translation="[18, 11]" />
+            <Label translation="[18, 16]" width="48" horizAlign="center" text="OK" color="0xFFFFFFFF">
+                <Font role="font" uri="pkg:/fonts/Archivo-Bold.otf" size="15" />
+            </Label>
+            <!-- Label -->
+            <SimpleLabel translation="[78, 13]" text="Saltar silencio" color="0xFFFFFFFF" fontSize="20" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+        </Group>
+
+        <!-- Modern Quality Selection Modal (Twitch TV style) -->
+        <QualityDialog id="qualityDialogModal" visible="false" />
     </children>
 </component>

@@ -64,6 +64,7 @@ multi-line text. You can only use EmojiLabel for single lines at a time. -->
         such as substituting the emoji poster's uri path for
         your own. -->
         <function name="getAllComponents" />
+        <function name="onDestroy" />
     </interface>
     <children>
         <Timer

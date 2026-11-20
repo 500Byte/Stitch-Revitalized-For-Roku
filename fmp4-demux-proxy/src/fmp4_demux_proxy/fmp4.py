@@ -201,9 +201,19 @@ def _remap_tkhd_track_id(trak_body: bytes, new_id: int) -> bytes:
     parts: list[bytes] = []
     for child_hdr, child_raw in _iter_children(trak_body):
         if child_hdr.type == b"tkhd":
+            if len(child_raw) <= child_hdr.header_size:
+                raise TruncatedBoxError(
+                    f"tkhd box too short: need > {child_hdr.header_size} bytes,"
+                    f" got {len(child_raw)}"
+                )
             raw_mut = bytearray(child_raw)
             version = raw_mut[child_hdr.header_size]
             id_off = child_hdr.header_size + (12 if version == 0 else 20)
+            if len(raw_mut) < id_off + 4:
+                raise TruncatedBoxError(
+                    f"tkhd box too short: need {id_off + 4} bytes for track_id,"
+                    f" got {len(raw_mut)}"
+                )
             struct.pack_into(">I", raw_mut, id_off, new_id)
             parts.append(bytes(raw_mut))
         else:
@@ -285,6 +295,11 @@ def _parse_tfhd_info(tfhd_body: bytes) -> tuple[int, int, int]:
         offset += 4
     default_sample_size = 0
     if flags & 0x000010:  # default_sample_size
+        if len(tfhd_body) < offset + 4:
+            raise TruncatedBoxError(
+                f"tfhd body too short: need {offset + 4} bytes for default_sample_size,"
+                f" got {len(tfhd_body)}"
+            )
         default_sample_size = struct.unpack_from(">I", tfhd_body, offset)[0]
     return track_id, flags, default_sample_size
 
@@ -304,12 +319,36 @@ def _parse_trun_data(
     off = 8
     data_offset = 0
     if flags & 0x001:
+        if len(trun_body) < off + 4:
+            raise TruncatedBoxError(
+                f"trun body too short: need {off + 4} bytes for data_offset, got {len(trun_body)}"
+            )
         data_offset = struct.unpack_from(">i", trun_body, off)[0]
         off += 4
     if flags & 0x004:  # first_sample_flags
+        if len(trun_body) < off + 4:
+            raise TruncatedBoxError(
+                f"trun body too short: need {off + 4} bytes for first_sample_flags,"
+                f" got {len(trun_body)}"
+            )
         off += 4
     total = 0
     has_size = bool(flags & 0x200)
+    per_sample_bytes = (
+        (4 if flags & 0x100 else 0)
+        + (4 if flags & 0x200 else 0)
+        + (4 if flags & 0x400 else 0)
+        + (4 if flags & 0x800 else 0)
+    )
+    if (
+        sample_count > 0
+        and per_sample_bytes > 0
+        and len(trun_body) < off + sample_count * per_sample_bytes
+    ):
+        raise TruncatedBoxError(
+            f"trun body too short: need {off + sample_count * per_sample_bytes} bytes for"
+            f" {sample_count} samples, got {len(trun_body)}"
+        )
     for _ in range(sample_count):
         if flags & 0x100:
             off += 4
@@ -361,13 +400,25 @@ def _rewrite_traf_for_split(
     running_offset = new_data_offset
     for ch, cr in _iter_children(traf_body):
         if ch.type == b"tfhd":
+            if len(cr) < ch.header_size + 8:
+                raise TruncatedBoxError(
+                    f"tfhd box too short: need {ch.header_size + 8} bytes, got {len(cr)}"
+                )
             mut = bytearray(cr)
             struct.pack_into(">I", mut, ch.header_size + 4, new_track_id)
             parts.append(bytes(mut))
         elif ch.type == b"trun":
             trun_body = cr[ch.header_size :]
+            if len(trun_body) < 4:
+                raise TruncatedBoxError(
+                    f"trun body too short: need 4 bytes for flags, got {len(trun_body)}"
+                )
             flags = (trun_body[1] << 16) | (trun_body[2] << 8) | trun_body[3]
             if flags & 0x001:
+                if len(cr) < ch.header_size + 12:
+                    raise TruncatedBoxError(
+                        f"trun box too short: need {ch.header_size + 12} bytes, got {len(cr)}"
+                    )
                 mut = bytearray(cr)
                 struct.pack_into(">i", mut, ch.header_size + 8, running_offset)
                 parts.append(bytes(mut))

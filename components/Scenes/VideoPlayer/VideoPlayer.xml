@@ -13,6 +13,7 @@
         <field id="control" type="string" alwaysNotify="true" onChange="controlChanged" />
         <field id="streams" type="assocarray" />
         <field id="ChatStarted" type="bool" value="false" />
+        <function name="onDestroy" />
     </interface>
     <script type="text/brightscript" uri="VideoPlayer.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/misc.brs" />
@@ -20,11 +21,11 @@
     <script type="text/brightscript" uri="pkg:/source/utils/liveRoute.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/taskFactory.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/analytics.brs" />
+    <script type="text/brightscript" uri="pkg:/source/utils/videoRecovery.brs" />
     <children>
         <Chat
             id="chat"
             visible="false"
-            translation="[1600,0]"
             forceLive="false" />
         <TwitchApiTask
             functionName="getTwitchBookmarks"

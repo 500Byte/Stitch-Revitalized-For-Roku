@@ -158,7 +158,7 @@ query ChannelHome_Query(
             id
             __typename
             login
-            profileImageURL(width: 70)
+            profileImageURL(width: 300)
             profileViewCount
             }
 

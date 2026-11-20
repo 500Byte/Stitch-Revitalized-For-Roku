@@ -33,6 +33,7 @@ function listBoxes(b as object, start as integer, finish as integer) as object
         size = u32(b, off)
         hdr = 8
         if size = 1
+            if finish - off < 16 then throw "box largesize cut off at " + off.toStr()
             ' 64-bit size: only the low 32 bits are supported.
             if u32(b, off + 8) <> 0 then throw "box too large at " + off.toStr()
             size = u32(b, off + 12)
@@ -78,8 +79,14 @@ end sub
 function tkhdTrackId(b as object, trak as object) as dynamic
     tk = findChild(b, trak, "tkhd")
     if tk = invalid then return invalid
+    tkLen = tk.size - tk.hdr
+    if tkLen < 1 then throw "tkhd too short"
     body = tk.off + tk.hdr
-    if b[body] = 0 then return u32(b, body + 12)
+    if b[body] = 0
+        if tkLen < 16 then throw "tkhd v0 too short"
+        return u32(b, body + 12)
+    end if
+    if tkLen < 24 then throw "tkhd v1 too short"
     return u32(b, body + 20)
 end function
 
@@ -156,28 +163,42 @@ function splitInit(b as object, file as string, tm as object, keep as string) as
     return out
 end function
 
-function tfhdDefaultSize(b as object, body as integer) as integer
+function tfhdDefaultSize(b as object, body as integer, bodyLen = -1 as integer) as integer
+    endLimit = b.Count()
+    if bodyLen >= 0 and body + bodyLen < endLimit then endLimit = body + bodyLen
+    if body + 8 > endLimit then throw "tfhd too short"
     flags = (b[body + 1] << 16) or (b[body + 2] << 8) or b[body + 3]
     off = body + 8
     if (flags and &h1) <> 0 then off = off + 8
     if (flags and &h2) <> 0 then off = off + 4
     if (flags and &h8) <> 0 then off = off + 4
-    if (flags and &h10) <> 0 then return u32(b, off)
+    if (flags and &h10) <> 0
+        if off + 4 > endLimit then throw "tfhd default_sample_size cut off"
+        return u32(b, off)
+    end if
     return 0
 end function
 
 ' { dataOffset, total, hasOffset } for one trun.
-function trunInfo(b as object, body as integer, defSize as integer) as object
+function trunInfo(b as object, body as integer, defSize as integer, bodyLen = -1 as integer) as object
+    endLimit = b.Count()
+    if bodyLen >= 0 and body + bodyLen < endLimit then endLimit = body + bodyLen
+    if body + 8 > endLimit then throw "trun too short"
     flags = (b[body + 1] << 16) or (b[body + 2] << 8) or b[body + 3]
     count = u32(b, body + 4)
+    if count < 0 then throw "trun negative sample_count"
     off = body + 8
     dataOffset = 0
     hasOffset = (flags and &h1) <> 0
     if hasOffset
+        if off + 4 > endLimit then throw "trun data_offset cut off"
         dataOffset = u32(b, off)
         off = off + 4
     end if
-    if (flags and &h4) <> 0 then off = off + 4
+    if (flags and &h4) <> 0
+        if off + 4 > endLimit then throw "trun first_sample_flags cut off"
+        off = off + 4
+    end if
     total = 0
     if (flags and &h200) <> 0
         stride = 4
@@ -188,6 +209,8 @@ function trunInfo(b as object, body as integer, defSize as integer) as object
         end if
         if (flags and &h400) <> 0 then stride = stride + 4
         if (flags and &h800) <> 0 then stride = stride + 4
+        avail = endLimit - off
+        if avail < 0 or count > Int(avail / stride) then throw "trun samples cut off"
         p = off + sizeAt
         for s = 1 to count
             total = total + u32(b, p)
@@ -226,7 +249,10 @@ sub splitFragment(out as object, b as object, file as string, tm as object, keep
             nonTraf.Push(ch)
         else
             tfhd = findChild(b, ch, "tfhd")
-            if tfhd <> invalid and trackIs(tm, u32(b, tfhd.off + tfhd.hdr + 4), keep) then kept = ch
+            if tfhd <> invalid
+                if tfhd.size - tfhd.hdr < 8 then throw "tfhd too short"
+                if trackIs(tm, u32(b, tfhd.off + tfhd.hdr + 4), keep) then kept = ch
+            end if
         end if
     end for
 
@@ -240,7 +266,7 @@ sub splitFragment(out as object, b as object, file as string, tm as object, keep
     defSize = 0
     for each k in kids
         if k.name = "tfhd"
-            defSize = tfhdDefaultSize(b, k.off + k.hdr)
+            defSize = tfhdDefaultSize(b, k.off + k.hdr, k.size - k.hdr)
             exit for
         end if
     end for
@@ -264,15 +290,20 @@ sub splitFragment(out as object, b as object, file as string, tm as object, keep
     dataTotal = 0
     for each k in kids
         at = trafStart + (k.off - kept.off)
+        kBodyLen = k.size - k.hdr
         if k.name = "tfhd"
+            if kBodyLen < 8 then throw "tfhd too short"
             putU32(out, at + k.hdr + 4, 1)
         else if k.name = "trun"
-            info = trunInfo(b, k.off + k.hdr, defSize)
+            info = trunInfo(b, k.off + k.hdr, defSize, kBodyLen)
             if info.total > 0
-                ranges.Push({ start: moof.off + info.dataOffset, size: info.total })
+                rStart = moof.off + info.dataOffset
+                if rStart < 0 or info.total < 0 or rStart + info.total > b.Count() then throw "mdat range out of bounds"
+                ranges.Push({ start: rStart, size: info.total })
                 dataTotal = dataTotal + info.total
             end if
             if info.hasOffset
+                if kBodyLen < 12 then throw "trun data_offset cut off"
                 putU32(out, at + k.hdr + 8, running)
                 running = running + info.total
             end if

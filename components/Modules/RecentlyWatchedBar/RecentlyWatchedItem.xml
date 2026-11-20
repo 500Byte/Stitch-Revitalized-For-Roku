@@ -7,6 +7,7 @@
         <field id="focused" type="bool" value="false" onChange="onFocusChanged" />
         <!-- Set by RecentlyWatchedBar after live status fetch -->
         <field id="isLive" type="bool" value="false" onChange="onIsLiveChanged" />
+        <function name="onDestroy" />
     </interface>
 
     <script type="text/brightscript" uri="RecentlyWatchedItem.brs" />

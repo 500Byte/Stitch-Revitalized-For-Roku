@@ -11,6 +11,7 @@ query StreamPlayer_Query(
             user(login: $login) {
                 login
                 stream @skip(if: $skipPlayToken) {
+                    createdAt
                     playbackAccessToken(params: {platform: $platform, playerType: $playerType}) {
                         signature
                         value

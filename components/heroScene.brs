@@ -150,36 +150,25 @@ function getAvailableMemoryKb() as dynamic
 end function
 
 sub cleanUserData()
-    active_user = get_setting("active_user", "$default$")
-    if active_user <> "$default$"
-        unset_user_setting("access_token")
-        unset_user_setting("device_code")
-        ? "default Registry keys: "; getRegistryKeys("$default$")
-        NukeRegistry(active_user)
+    for each key in ["access_token", "refresh_token", "login", "id", "display_name", "profile_image_url"]
+        unset_user_setting(key)
+    end for
+    if get_setting("active_user", "$default$") <> "$default$"
         set_setting("active_user", "$default$")
-        ? "active User: "; get_setting("active_user", "$default$")
-    else
-        for each key in getRegistryKeys("$default$")
-            ' Bookmarks are per device, not per account: keep them so anonymous replays resume.
-            if key <> "temp_device_code" and key <> "device_code" and key <> "VideoBookmarks"
-                unset_user_setting(key)
-            end if
-        end for
     end if
 end sub
 
 sub ValidateUserLogin()
-    if m.validateOauthToken?.response?.tokenValid <> invalid
-        tokenValid = m.validateOauthToken.response.tokenValid
-    else
-        tokenValid = false
-    end if
-    if tokenValid
-        ? "User Token Seems Valid"
-    else
+    rsp = m.validateOauthToken?.response
+    m.validateOauthToken = destroyTask(m.validateOauthToken, "response")
+    if rsp <> invalid and rsp.status = "invalid"
         cleanUserData()
         m.menu.updateUserIcon = true
-        ? "pause"
+    else if rsp <> invalid and rsp.status = "valid"
+        ? "User Token Seems Valid"
+        if get_user_setting("profile_image_url", "") = ""
+            m.menu.updateUserIcon = true
+        end if
     end if
 end sub
 
@@ -281,12 +270,21 @@ sub restoreFocusAfterDialog(closed as object)
 end sub
 
 sub handleDeviceCode()
-    if m.getDeviceCodeTask <> invalid
-        response = m.getDeviceCodeTask.response
-        if response = invalid then return
-        set_user_setting("device_code", response.device_code)
-    end if
+    response = m.getDeviceCodeTask?.response
+    m.getDeviceCodeTask = destroyTask(m.getDeviceCodeTask, "response")
+    if response = invalid then return
+    set_user_setting("device_code", response.device_code)
     onMenuSelection()
+end sub
+
+' Unobserve shared scene events and run component cleanup before detaching from HeroScene.
+sub removeSceneNode(node as dynamic)
+    if node = invalid then return
+    node.unobserveField("backPressed")
+    node.unobserveField("contentSelected")
+    node.unobserveField("finished")
+    node.callFunc("onDestroy")
+    m.top.removeChild(node)
 end sub
 
 function buildNode(name)
@@ -334,20 +332,10 @@ end function
 ' Tear down activeNode and any footprints (back-stack) so login/logout
 ' transitions don't leave stale, detached scenes wired up with observers.
 sub teardownAllScenes()
-    if m.activeNode <> invalid
-        m.activeNode.unobserveField("backPressed")
-        m.activeNode.unobserveField("contentSelected")
-        m.activeNode.unobserveField("finished")
-        m.top.removeChild(m.activeNode)
-        m.activeNode = invalid
-    end if
+    removeSceneNode(m.activeNode)
+    m.activeNode = invalid
     for each node in m.footprints
-        if node <> invalid
-            node.unobserveField("backPressed")
-            node.unobserveField("contentSelected")
-            node.unobserveField("finished")
-            m.top.removeChild(node)
-        end if
+        removeSceneNode(node)
     end for
     m.footprints = []
 end sub
@@ -388,11 +376,13 @@ sub onMenuSelection()
         content.streamerId = get_user_setting("id")
         content.streamerProfileImageUrl = get_user_setting("profile_image_url")
         content.contentType = "STREAMER"
-        m.activeNode.contentSelected = content
+        if m.activeNode <> invalid
+            m.activeNode.contentSelected = content
+        end if
     else
         if m.menu.focusedChild = invalid then return
         if m.activeNode <> invalid and m.activeNode.id.toStr() <> menuItem
-            m.top.removeChild(m.activeNode)
+            removeSceneNode(m.activeNode)
             m.activeNode = invalid
         end if
         if m.activeNode = invalid
@@ -425,7 +415,7 @@ sub onDeepLink()
 
     ' Stop any playing video before navigating, the same way Back would.
     if m.activeNode <> invalid and m.activeNode.id = "VideoPlayer"
-        m.top.removeChild(m.activeNode)
+        removeSceneNode(m.activeNode)
         m.activeNode = invalid
         if m.footprints.Count() > 0 then m.activeNode = m.footprints.pop()
     end if
@@ -468,9 +458,12 @@ sub onContentSelected()
     if m.activeNode.playContent = true
         id = "VideoPlayer"
     end if
+    if id = invalid then return
     holdContent = m.activeNode.contentSelected.getFields()
     content = createObject("roSGNode", "TwitchContentNode")
     setTwitchContentFields(content, holdContent)
+    nextNode = buildNode(id)
+    if nextNode = invalid then return
     if m.activeNode <> invalid
         ' Save focus before pushing
         focused = lastFocusedChild(m.activeNode)
@@ -480,12 +473,8 @@ sub onContentSelected()
             m.activeNode.lastFocus = invalid
         end if
         m.footprints.push(m.activeNode)
-        m.activeNode = invalid
     end if
-    if m.activeNode = invalid
-        m.activeNode = buildNode(id)
-        if m.activeNode = invalid then return
-    end if
+    m.activeNode = nextNode
     m.activeNode.contentRequested = content
     m.activeNode.setfocus(true)
 end sub
@@ -494,7 +483,7 @@ sub onBackPressed()
     if m.activeNode.backPressed = invalid or not m.activeNode.backPressed then return
     if m.footprints.Count() > 0
         if m.activeNode <> invalid
-            m.top.removeChild(m.activeNode)
+            removeSceneNode(m.activeNode)
         end if
         m.activeNode = m.footprints.pop()
         ' Restore focus to previously focused child if available
@@ -572,22 +561,13 @@ sub onDestroy()
     if m.recentBar <> invalid
         m.recentBar.unobserveField("contentSelected")
         m.recentBar.unobserveField("becameEmpty")
+        m.recentBar.callFunc("onDestroy")
     end if
     if m.menu <> invalid
         m.menu.unobserveField("buttonSelected")
+        m.menu.callFunc("onDestroy")
     end if
-    if m.activeNode <> invalid
-        m.activeNode.unobserveField("backPressed")
-        m.activeNode.unobserveField("contentSelected")
-        m.activeNode.unobserveField("finished")
-    end if
-    for each node in m.footprints
-        if node <> invalid
-            node.unobserveField("backPressed")
-            node.unobserveField("contentSelected")
-            node.unobserveField("finished")
-        end if
-    end for
+    teardownAllScenes()
     m.validateOauthToken = destroyTask(m.validateOauthToken, "response")
     m.getDeviceCodeTask = destroyTask(m.getDeviceCodeTask, "response")
 end sub

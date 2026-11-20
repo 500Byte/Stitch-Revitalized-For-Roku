@@ -1,48 +1,35 @@
 function validateOauthToken() as object
-    access_token = invalid
-    device_code = invalid
-    ' doubled up here in stead of defaulting to "" because access_token is dependent on device_code
-    if get_user_setting("device_code") <> invalid
-        device_code = get_user_setting("device_code")
-        if get_user_setting("access_token") <> invalid
-            access_token = "OAuth " + get_user_setting("access_token")
-        end if
-    else
-        return false
+    activeUser = get_setting("active_user", "$default$")
+    device_code = get_user_setting("device_code")
+    token = get_user_setting("access_token")
+    if activeUser = "$default$" or device_code = invalid or token = invalid or token = ""
+        m.top.response = { "status": "anonymous", "tokenValid": true }
+        m.top.control = TaskControl.STOP
+        return invalid
     end if
+
     reqHeaders = {
         "Accept": "*/*",
         "Client-Id": "ue6666qo983tsx6so1t0vnawi233wa",
         "Device-ID": device_code,
         "Origin": "https://android.tv.twitch.tv",
         "Referer": "https://android.tv.twitch.tv/",
-        "Accept-Language": getDeviceLocale()
+        "Accept-Language": getDeviceLocale(),
+        "Authorization": "OAuth " + token
     }
-    if access_token <> invalid
-        reqHeaders["Authorization"] = access_token
-    end if
     req = HttpRequest({
         url: "https://id.twitch.tv/oauth2/validate",
         headers: reqHeaders,
-        method: "GET"
+        method: "GET",
+        timeout: 10000
     })
     sendResult = req.send()
-    if sendResult = invalid
-        m.top.response = { "tokenValid": false }
-        m.top.control = TaskControl.STOP
-        return invalid
+    parsedRsp = invalid
+    if sendResult <> invalid
+        parsedRsp = ParseJSON(sendResult)
     end if
-    rsp = ParseJSON(sendResult)
-    if rsp?.status <> invalid
-        if rsp.status = 401
-            m.top.response = { "tokenValid": false }
-        end if
-    end if
-    if rsp?.expires_in <> invalid
-        m.top.response = { "tokenValid": true }
-    end if
+    m.top.response = classifyOauthValidation(activeUser, token, sendResult, parsedRsp)
     m.top.control = TaskControl.STOP
-    ? "pause"
     return invalid
 end function
 
@@ -54,7 +41,8 @@ sub getRendezvouzToken()
             "origin": "https://android.tv.twitch.tv",
             "referer": "https://android.tv.twitch.tv/"
         },
-        method: "POST"
+        method: "POST",
+        timeout: 10000
     })
     rsp = ParseJSON(req.send() ?? "")
     if rsp = invalid or rsp?.device_code = invalid or rsp?.user_code = invalid
@@ -77,6 +65,11 @@ function getOauthToken()
         m.top.control = TaskControl.STOP
         return invalid
     end if
+    pollIntervalSec = 5
+    if m.top.request.params.interval <> invalid and m.top.request.params.interval > 1
+        pollIntervalSec = m.top.request.params.interval
+    end if
+    maxAttempts = 360
     req = HttpRequest({
         url: "https://id.twitch.tv/oauth2/token" + "?client_id=ue6666qo983tsx6so1t0vnawi233wa&device_code=" + m.top.request.params.device_code + "&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code",
         headers: {
@@ -85,15 +78,30 @@ function getOauthToken()
             "referer": "https://android.tv.twitch.tv/",
             "accept": "application/json"
         },
-        method: "POST"
+        method: "POST",
+        timeout: 10000
     })
-    while true
-        rsp = ParseJSON(req.send() ?? "")
-        if rsp <> invalid and rsp.DoesExist("access_token")
-            exit while
+    rsp = invalid
+    for attempt = 1 to maxAttempts
+        raw = req.send()
+        if raw <> invalid
+            rsp = ParseJSON(raw)
+            if rsp <> invalid
+                if rsp.DoesExist("access_token")
+                    exit for
+                end if
+                msg = ""
+                if rsp.message <> invalid then msg = LCase(rsp.message.toStr())
+                if msg = "slow_down"
+                    pollIntervalSec = pollIntervalSec + 2
+                else if rsp.status <> invalid and rsp.status >= 400 and msg <> "authorization_pending"
+                    rsp = invalid
+                    exit for
+                end if
+            end if
         end if
-        sleep(5000)
-    end while
+        sleep(pollIntervalSec * 1000)
+    end for
     if rsp <> invalid and rsp?.access_token <> invalid
         m.top.response = {
             access_token: rsp.access_token

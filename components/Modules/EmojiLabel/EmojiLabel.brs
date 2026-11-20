@@ -26,6 +26,16 @@ sub init()
     if m.timer <> invalid
         m.timer.observeField("fire", "onTimerFireChange")
     end if
+    m.scrollDelayTimer = createObject("roSGNode", "Timer")
+    m.scrollDelayTimer.duration = 0.2
+    m.scrollDelayTimer.repeat = false
+    m.scrollDelayTimer.observeField("fire", "onScrollDelayFire")
+    m.emojiRegex = invalid
+    try
+        m.emojiRegex = createObject("roRegex", regex(), "m")
+    catch e
+        m.emojiRegex = invalid
+    end try
     setText()
 end sub
 
@@ -37,31 +47,33 @@ sub onTimerFireChange() as void
     m.timer.control = "stop"
 end sub
 
+sub onScrollDelayFire()
+    if m.animation = invalid or m.timer = invalid or m.top.repeatCount = 0 then return
+    if m.top.maxWidth > 0
+        dur = (m.top.width / m.top.maxWidth) * 2
+        m.animation.duration = dur
+        m.timer.duration = dur
+    end if
+    m.animation.repeat = true
+    m.timer.repeat = true
+    m.animation.control = "start"
+    m.timer.control = "start"
+end sub
+
 sub doScroll()
     if m.animation = invalid or m.timer = invalid then return
-    if m.top.repeatCount <> invalid
-        if m.top.repeatCount <> 0
-            m.animation.repeat = true
-            m.timer.repeat = true
-            ' this sleep is so that when you change from one item to another,
-            ' you have enough time to read the first 1-2 words before scrolling.
-            sleep(200)
-            m.animation.control = "start"
-            m.timer.control = "start"
-            m.animation.duration = (m.top.width / m.top.maxWidth) * 2
-            m.timer.duration = (m.top.width / m.top.maxWidth) * 2
-            ' else
-            '     m.animation.repeat = false
-            '     ' m.animation.control = "stop"
-            '     m.animation.duration = 0
-            '     m.timer.repeat = false
-            '     m.timer.control = "stop"
+    if m.scrollDelayTimer <> invalid then m.scrollDelayTimer.control = "stop"
+    if m.top.repeatCount <> invalid and m.top.repeatCount <> 0
+        if m.scrollDelayTimer <> invalid
+            m.scrollDelayTimer.control = "start"
         else
-            m.animation.repeat = false
-            m.animation.control = "stop"
-            m.components.translation = [0, 0]
-            m.timer.control = "stop"
+            onScrollDelayFire()
         end if
+    else
+        m.animation.repeat = false
+        m.animation.control = "stop"
+        m.components.translation = [0, 0]
+        m.timer.control = "stop"
     end if
 end sub
 
@@ -158,71 +170,8 @@ sub updateComponents()
             x: 0,
             y: (0 - (m.top.height / 2))
         }
-        ' m.top.translation = [m.top.translation[0], m.top.translation[1] + (height / 2)]
-        ' m.components.translation = [xTranslation, height]
     end if
 end sub
-
-' Convenience function to check if we need to truncate the label
-sub checkBoundingWidth()
-    curWidth = 0
-    width = m.top.width
-    ' Reset previous ellipsis if present
-    existingEllipsis = m.components.findNode("ellipsis")
-    if existingEllipsis <> invalid
-        m.components.removeChild(existingEllipsis)
-    end if
-
-    comps = getAllComponents()
-
-    for index = 0 to comps.count() - 1
-        comp = comps[index]
-        ' If we are already over the width, then don't display any other components
-        if curWidth >= width and width > 0
-            comp.visible = false
-        else
-            ' See if this component extends beyond the available width
-            compWidth = comp.boundingRect().width
-            curWidth += compWidth
-
-            if curWidth > width and width > 0
-                diff = curWidth - width
-
-                ' For labels, we might be able to have the label use proper ellipsis by itself
-                if comp.subType() = "Label"
-                    newCompWidth = compWidth - diff
-                    ellipsis = createLabel("…")
-                    minWidth = ellipsis.boundingRect().width
-                    ' If the label is too short to have an ellipsis itself, insert one here
-                    if newCompWidth <= minWidth
-                        comp.visible = false
-                        ellipsis.id = "ellipsis"
-                        m.components.insertChild(ellipsis, index)
-                    else
-                        ' Label will use ellipsis with explicit width set
-                        comp.width = newCompWidth
-                    end if
-                else
-                    ' Replace with ellipsis
-                    comp.visible = false
-                    ellipsis = createLabel("…")
-                    ellipsis.id = "ellipsis"
-                    m.components.insertChild(ellipsis, index)
-                end if
-            end if
-        end if
-    end for
-end sub
-
-' function normalizeText(text as string)
-'     unicodeRegex = createObject("roRegex", unidecodeRegex(), "m")
-'     matches = unicodeRegex.matchAll(text)
-'     for each match in matches
-'         matchText = match[0]
-'         text = text.replace(matchText, textPointName(matchText))
-'     end for
-'     return text
-' end function
 
 ' Updates the entire label components with new text.
 sub setText()
@@ -230,30 +179,24 @@ sub setText()
 
     resetComponents()
     if labelText <> ""
-        ' Check for emojis in this text
-        emojiRegex = createObject("roRegex", regex(), "m")
-        matches = emojiRegex.matchAll(labelText)
+        if m.emojiRegex <> invalid
+            matches = m.emojiRegex.matchAll(labelText)
+            for each match in matches
+                matchText = match[0]
+                loc = labelText.instr(matchText)
+                if loc > 0
+                    leftText = labelText.left(loc)
+                    m.components.appendChild(createLabel(leftText))
+                end if
 
-        for each match in matches
-            matchText = match[0]
-            ' Create the label representing all text before this match,
-            ' if there is any
-            loc = labelText.instr(matchText)
-            if loc > 0
-                leftText = labelText.left(loc)
-                m.components.appendChild(createLabel(leftText))
-            end if
+                pointURI = emojiPointName(matchText)
+                m.components.appendChild(createPoster(pointURI))
 
-            ' Get the URI for this emoji and create the poster
-            pointURI = emojiPointName(matchText)
-            m.components.appendChild(createPoster(pointURI))
+                labelText = labelText.mid(loc + matchText.len())
+            end for
+        end if
 
-            ' Update the remaining text. Set to be text after this emoji.
-            labelText = labelText.mid(loc + matchText.len())
-        end for
-
-        ' If we have text at the end after the last emoji match, create
-        ' a label for that text.
+        ' If we have remaining text (or regex unavailable), create a label for it.
         if labelText <> ""
             m.components.appendChild(createLabel(labelText))
         end if
@@ -314,6 +257,10 @@ end sub
 
 
 sub onDestroy()
+    if m.scrollDelayTimer <> invalid
+        m.scrollDelayTimer.control = "stop"
+        m.scrollDelayTimer.unobserveField("fire")
+    end if
     if m.timer <> invalid
         m.timer.control = "stop"
         m.timer.unobserveField("fire")

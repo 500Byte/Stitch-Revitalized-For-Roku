@@ -1,10 +1,19 @@
 sub init()
     m.top.observeField("focusedChild", "onGetfocus")
+    m.searchTitle = m.top.findNode("searchTitle")
+    if m.searchTitle <> invalid then m.searchTitle.text = tr("Search")
     m.recents = m.top.findnode("recents")
-    ' m.recents.buttons = ["Ammo", "paymoneywubby", "three"]
     if m.recents <> invalid
-        m.recents.TextColor = m.global.constants.colors.muted.ice
-        m.recents.FocusedTextColor = m.global.constants.colors.twitch.purple10
+        recentsFont = CreateObject("roSGNode", "Font")
+        recentsFont.uri = "pkg:/fonts/Archivo-Regular.otf"
+        recentsFont.size = 18
+        recentsFocusedFont = CreateObject("roSGNode", "Font")
+        recentsFocusedFont.uri = "pkg:/fonts/Archivo-Bold.otf"
+        recentsFocusedFont.size = 18
+        m.recents.textFont = recentsFont
+        m.recents.focusedTextFont = recentsFocusedFont
+        m.recents.textColor = "0xADADB8FF"
+        m.recents.focusedTextColor = "0xFFFFFFFF"
         m.recents.observeField("buttonSelected", "onRecentItemSelected")
     end if
     m.kb = m.top.findNode("keyboard")
@@ -12,7 +21,12 @@ sub init()
     m.kb.textEditBox.voiceEnabled = true
     m.kb.observefield("text", "handleTextInput")
     m.rowlist = m.top.findNode("homeRowList")
+    styleRowListHeader(m.rowlist)
     m.rowlist.ObserveField("itemSelected", "handleItemSelected")
+    m.searchDebounceTimer = createObject("roSGNode", "Timer")
+    m.searchDebounceTimer.duration = 0.3
+    m.searchDebounceTimer.repeat = false
+    m.searchDebounceTimer.observeField("fire", "executeSearch")
     updateRecents()
 end sub
 
@@ -46,27 +60,35 @@ sub onRecentItemSelected()
 end sub
 
 sub adjustPositionForRecents()
-    yTranslation = 120
+    yTranslation = 174
     if m.recents.buttons.count() > 0
-        m.recents.buttonHeight = (m.recents.textFont.size * 3)
-        ' bound = m.recents.boundingrect()
-        ' localbound = m.recents.localboundingrect()
-        ' yTranslation = m.recents.localboundingrect().height
-        for each button in m.recents.buttons
-            yTranslation += (m.recents.textFont.size * 2)
-        end for
-        ' ? "pause"
-
-        m.kb.translation = [m.kb.translation[0], yTranslation]
+        yTranslation = 174 + (m.recents.buttons.count() * 52) + 16
     end if
+    m.kb.translation = [132, yTranslation]
 end sub
 
 sub handleTextInput()
     if m.kb.text <> invalid and m.kb.text <> ""
         m.rowlist.visible = false
         m.rowlist.content = invalid
-        m.GetContentTask = createApiTask("getSearchQuery", "handleRecommendedSections", { query: m.kb.text.toStr() })
+        if m.searchDebounceTimer <> invalid
+            m.searchDebounceTimer.control = "stop"
+            m.searchDebounceTimer.control = "start"
+        else
+            executeSearch()
+        end if
+    else
+        if m.searchDebounceTimer <> invalid then m.searchDebounceTimer.control = "stop"
+        m.GetContentTask = destroyTask(m.GetContentTask, "response")
+        m.rowlist.visible = false
+        m.rowlist.content = invalid
     end if
+end sub
+
+sub executeSearch()
+    if m.kb = invalid or m.kb.text = invalid or m.kb.text = "" then return
+    m.GetContentTask = destroyTask(m.GetContentTask, "response")
+    m.GetContentTask = createApiTask("getSearchQuery", "handleRecommendedSections", { query: m.kb.text.toStr() })
 end sub
 
 sub handleRecommendedSections()
@@ -100,7 +122,9 @@ sub buildContentNodeFromShelves(shelves)
             rowItem.streamerProfileImageUrl = item.stream.broadcaster.profileImageURL
             if item.stream.game <> invalid
                 rowItem.gameDisplayName = item.stream.game.displayName
-                rowItem.gameBoxArtUrl = Left(item.stream.game.boxArtUrl, Len(item.stream.game.boxArtUrl) - 20) + "188x250.jpg"
+                if item.stream.game.boxArtUrl <> invalid
+                    rowItem.gameBoxArtUrl = formatTwitchImageUrl(item.stream.game.boxArtUrl, "188", "250")
+                end if
                 rowItem.gameId = item.stream.game.Id
                 rowItem.gameName = item.stream.game.name
             end if
@@ -125,7 +149,9 @@ sub buildContentNodeFromShelves(shelves)
         rowItem.viewersCount = game.viewersCount
         rowItem.contentTitle = game.displayName
         rowItem.gameDisplayName = game.displayName
-        rowItem.gameBoxArtUrl = Left(game.boxArtUrl, Len(game.boxArtUrl) - 20) + "188x250.jpg"
+        if game.boxArtUrl <> invalid
+            rowItem.gameBoxArtUrl = formatTwitchImageUrl(game.boxArtUrl, "188", "250")
+        end if
         rowItem.gameId = game.Id
         rowItem.gameName = game.name
         Games.push(rowItem)
@@ -136,9 +162,9 @@ sub buildContentNodeFromShelves(shelves)
         rowItem.contentType = "VOD"
         rowItem.contentId = VOD.Id
         if VOD.previewThumbnailURL <> invalid
-            rowItem.previewImageURL = Left(VOD.previewThumbnailURL, len(VOD.previewThumbnailURL) - 20) + "320x180." + Right(VOD.previewThumbnailURL, 3)
+            rowItem.previewImageURL = formatTwitchImageUrl(VOD.previewThumbnailURL, "640", "360")
         else if VOD.thumbnailURL <> invalid
-            rowItem.previewImageURL = VOD.thumbnailURL
+            rowItem.previewImageURL = formatTwitchImageUrl(VOD.thumbnailURL, "640", "360")
         end if
         rowItem.contentTitle = VOD.title
         rowItem.viewersCount = VOD.viewCount
@@ -147,7 +173,9 @@ sub buildContentNodeFromShelves(shelves)
         rowItem.streamerId = VOD.owner.id
         if VOD.game <> invalid
             rowItem.gameDisplayName = VOD.game.displayName
-            rowItem.gameBoxArtUrl = Left(VOD.game.boxArtUrl, Len(VOD.game.boxArtUrl) - 20) + "188x250.jpg"
+            if VOD.game.boxArtUrl <> invalid
+                rowItem.gameBoxArtUrl = formatTwitchImageUrl(VOD.game.boxArtUrl, "188", "250")
+            end if
             rowItem.gameId = VOD.game.Id
             rowItem.gameName = VOD.game.name
         end if
@@ -192,13 +220,15 @@ sub buildContentNodeFromShelves(shelves)
         AllContent.appendChild(firstRow)
     end if
     if secondRow.getchildCount() > 0
-        rowItemSize.push([150, 150])
-        rowHeights.push(200)
+        userRow = getRowConfig("USER", true)
+        rowItemSize.push(userRow.itemSize)
+        rowHeights.push(userRow.rowHeight)
         AllContent.appendChild(secondRow)
     end if
     if thirdRow.getchildCount() > 0
-        rowItemSize.push([188, 250])
-        rowHeights.push(325)
+        gameRow = getRowConfig("GAME", true)
+        rowItemSize.push(gameRow.itemSize)
+        rowHeights.push(gameRow.rowHeight)
         AllContent.appendChild(thirdRow)
     end if
     if fourthRow.getchildCount() > 0
@@ -260,14 +290,14 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if press
         ? "Search Key Press: "; key
         if key = "right"
-            if m.top.focusedChild.id = "keyboard" or m.top.focusedChild.id = "recents"
+            if m.top.focusedChild <> invalid and (m.top.focusedChild.id = "keyboard" or m.top.focusedChild.id = "recents")
                 m.kb.setfocus(false)
                 m.rowlist.setfocus(true)
                 return true
             end if
         end if
         if key = "left"
-            if m.top.focusedChild.id = "homeRowList"
+            if m.top.focusedChild <> invalid and m.top.focusedChild.id = "homeRowList"
                 m.rowlist.setfocus(false)
                 m.kb.setfocus(true)
                 return true
@@ -298,8 +328,12 @@ end function
 
 sub onDestroy()
     m.top.unobserveField("focusedChild")
-    m.recents.unobserveField("buttonSelected")
-    m.kb.unobserveField("text")
-    m.rowlist.unobserveField("itemSelected")
+    if m.recents <> invalid then m.recents.unobserveField("buttonSelected")
+    if m.kb <> invalid then m.kb.unobserveField("text")
+    if m.rowlist <> invalid then m.rowlist.unobserveField("itemSelected")
+    if m.searchDebounceTimer <> invalid
+        m.searchDebounceTimer.control = "stop"
+        m.searchDebounceTimer.unobserveField("fire")
+    end if
     m.GetContentTask = destroyTask(m.GetContentTask, "response")
 end sub

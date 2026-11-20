@@ -350,3 +350,242 @@ def test_cache_key_ignores_twitch_s1_prefix() -> None:
     assert _cache_key(f"{host}/s1/v1/segment/def.mp4?dna=x") == init
     assert _cache_key(f"{host}/s12/v1/segment/def.mp4") == init
     assert _cache_key(f"{host}/seg/v1/segment/def.mp4") != init
+
+
+class TestSecurityAndContinuity:
+    async def test_m3u8_rejects_redirect_to_disallowed_host(self, aiohttp_client) -> None:
+        app = create_app(config=make_test_config(upstream_host_allowlist=("127.0.0.1",)))
+        client = await aiohttp_client(app)
+
+        up = web.Application()
+
+        async def redir(_req: web.Request) -> web.Response:
+            raise web.HTTPFound(location="http://169.254.169.254/latest/meta-data")
+
+        up.router.add_get("/master", redir)
+        srv = TestServer(up)
+        await srv.start_server()
+        try:
+            url = str(srv.make_url("/master"))
+            resp = await client.get(f"/m3u8?u={quote(url, safe='')}")
+            assert resp.status == 400
+            assert "disallowed upstream host" in await resp.text()
+        finally:
+            await srv.close()
+
+    async def test_segment_rejects_redirect_to_disallowed_host(self, aiohttp_client) -> None:
+        app = create_app(config=make_test_config(upstream_host_allowlist=("127.0.0.1",)))
+        client = await aiohttp_client(app)
+
+        up = web.Application()
+
+        async def redir(_req: web.Request) -> web.Response:
+            raise web.HTTPFound(location="http://evil.example.com/seg.m4s")
+
+        up.router.add_get("/seg.m4s", redir)
+        srv = TestServer(up)
+        await srv.start_server()
+        try:
+            url = str(srv.make_url("/seg.m4s"))
+            resp = await client.get(f"/s?u={quote(url, safe='')}&k=init&track=video")
+            assert resp.status == 400
+            assert "disallowed upstream host" in await resp.text()
+        finally:
+            await srv.close()
+
+    async def test_media_fetches_init_on_demand_via_map_param(
+        self, proxy_client: TestClient, upstream: TestServer
+    ) -> None:
+        init_bytes = make_init_segment(traks=[(1, b"soun"), (2, b"vide")])
+        media_bytes = make_media_segment(sequence=1, trafs=[1, 2])
+        upstream.app["init"] = init_bytes
+        upstream.app["media"] = media_bytes
+
+        init_url = str(upstream.make_url("/init.mp4"))
+        seg_url = str(upstream.make_url("/seg-1.m4s"))
+        upstream.app["variant"] = (
+            "#EXTM3U\n"
+            "#EXT-X-VERSION:6\n"
+            "#EXT-X-TARGETDURATION:2\n"
+            "#EXT-X-MEDIA-SEQUENCE:1\n"
+            f'#EXT-X-MAP:URI="{init_url}"\n'
+            "#EXTINF:2.000,\n"
+            f"{seg_url}\n"
+        ).encode()
+
+        m3u8_url = str(upstream.make_url("/variant"))
+        m3u8_resp = await proxy_client.get(f"/m3u8?u={quote(m3u8_url, safe='')}&track=video")
+        assert m3u8_resp.status == 200
+        body = await m3u8_resp.text()
+        seg_proxy_line = next(
+            ln for ln in body.splitlines() if not ln.startswith("#") and "/s?" in ln
+        )
+        assert "&map=" in seg_proxy_line
+
+        # Request media directly WITHOUT requesting init first — proxy must fetch init on demand
+        parsed = urlparse(seg_proxy_line)
+        seg_resp = await proxy_client.get(f"{parsed.path}?{parsed.query}")
+        assert seg_resp.status == 200
+        demuxed = await seg_resp.read()
+        assert len(demuxed) < len(media_bytes)
+
+    async def test_m3u8_preserves_discontinuity_sequence_across_ad_drop(
+        self, proxy_client: TestClient, upstream: TestServer
+    ) -> None:
+        seg_url = str(upstream.make_url("/seg-1.m4s"))
+        upstream.app["variant"] = (
+            "#EXTM3U\n"
+            "#EXT-X-VERSION:6\n"
+            "#EXT-X-TARGETDURATION:2\n"
+            "#EXT-X-MEDIA-SEQUENCE:10\n"
+            "#EXTINF:2.0,\n"
+            f"{seg_url}?n=10\n"
+            "#EXT-X-DISCONTINUITY\n"
+            "#EXTINF:2.0,\n"
+            f"{seg_url}?n=11\n"
+        ).encode()
+        m3u8_url = str(upstream.make_url("/variant"))
+        r1 = await proxy_client.get(f"/m3u8?u={quote(m3u8_url, safe='')}&track=video&k=s1")
+        assert r1.status == 200
+
+        # Slide window past segment 11 so the discontinuity tag drops off the top
+        upstream.app["variant"] = (
+            "#EXTM3U\n"
+            "#EXT-X-VERSION:6\n"
+            "#EXT-X-TARGETDURATION:2\n"
+            "#EXT-X-MEDIA-SEQUENCE:12\n"
+            "#EXTINF:2.0,\n"
+            f"{seg_url}?n=12\n"
+            "#EXTINF:2.0,\n"
+            f"{seg_url}?n=13\n"
+        ).encode()
+        r2 = await proxy_client.get(f"/m3u8?u={quote(m3u8_url, safe='')}&track=video&k=s1")
+        assert r2.status == 200
+        text2 = await r2.text()
+        assert "#EXT-X-DISCONTINUITY-SEQUENCE:1" in text2
+
+    async def test_m3u8_sanitizes_forwarded_proto_and_rejects_injected_host(
+        self, proxy_client: TestClient, upstream: TestServer
+    ) -> None:
+        variant_url = str(upstream.make_url("/variant"))
+        upstream.app["master"] = (
+            f"#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=500000\n{variant_url}\n"
+        ).encode()
+        m3u8_url = str(upstream.make_url("/master"))
+
+        bad = await proxy_client.get(
+            f"/m3u8?u={quote(m3u8_url, safe='')}",
+            headers={"X-Forwarded-Host": "evil.com/path@inject"},
+        )
+        assert bad.status == 400
+
+        # Invalid X-Forwarded-Proto falls back safely to request.scheme (http)
+        good = await proxy_client.get(
+            f"/m3u8?u={quote(m3u8_url, safe='')}",
+            headers={"X-Forwarded-Proto": "javascript", "X-Forwarded-Host": "proxy.local:8080"},
+        )
+        assert good.status == 200
+        body = await good.text()
+        assert "http://proxy.local:8080/m3u8?u=" in body
+
+    async def test_vod_manifest_does_not_populate_break_store(
+        self, proxy_client: TestClient, upstream: TestServer
+    ) -> None:
+        from fmp4_demux_proxy.routes.m3u8_route import BREAK_STORE_KEY
+
+        seg_url = str(upstream.make_url("/seg-1.m4s"))
+        upstream.app["variant"] = (
+            "#EXTM3U\n"
+            "#EXT-X-TARGETDURATION:2\n"
+            "#EXT-X-MEDIA-SEQUENCE:1\n"
+            f"#EXTINF:2.0,\n{seg_url}\n"
+            "#EXT-X-ENDLIST\n"
+        ).encode()
+        m3u8_url = str(upstream.make_url("/variant"))
+        resp = await proxy_client.get(f"/m3u8?u={quote(m3u8_url, safe='')}&track=video&k=vod1")
+        assert resp.status == 200
+        assert len(proxy_client.app[BREAK_STORE_KEY].lists) == 0
+
+    async def test_oversized_upstream_m3u8_returns_502(
+        self, proxy_client: TestClient, upstream: TestServer
+    ) -> None:
+        upstream.app["master"] = b"#EXTM3U\n" + (b"A" * (2 * 1024 * 1024 + 100))
+        m3u8_url = str(upstream.make_url("/master"))
+        resp = await proxy_client.get(f"/m3u8?u={quote(m3u8_url, safe='')}")
+        assert resp.status == 502
+
+    async def test_multi_init_same_directory_switches_track_map_by_map_param(
+        self, aiohttp_client
+    ) -> None:
+        from fmp4_demux_proxy.fmp4 import iter_top_level_boxes
+        from tests._fixtures import make_split_media_segment
+
+        # Track IDs flipped between live init1 (1=video,2=audio) and ad init2 (1=audio,2=video)
+        init1 = make_init_segment(traks=[(1, b"vide"), (2, b"soun")])
+        init2 = make_init_segment(traks=[(1, b"soun"), (2, b"vide")])
+        live_media = make_split_media_segment(1, b"\xaa" * 200, b"\xbb" * 80)
+        ad_media = make_split_media_segment(1, b"\xcc" * 80, b"\xdd" * 240)
+
+        up = web.Application()
+        up.router.add_get("/v1/init_live.mp4", lambda _r: web.Response(body=init1))
+        up.router.add_get("/v1/init_ad.mp4", lambda _r: web.Response(body=init2))
+        up.router.add_get("/v1/seg_live.m4s", lambda _r: web.Response(body=live_media))
+        up.router.add_get("/v1/seg_ad.m4s", lambda _r: web.Response(body=ad_media))
+
+        def playlist_h(req: web.Request) -> web.Response:
+            base = str(req.url.origin())
+            body = (
+                "#EXTM3U\n"
+                "#EXT-X-VERSION:6\n"
+                "#EXT-X-TARGETDURATION:2\n"
+                "#EXT-X-MEDIA-SEQUENCE:1\n"
+                f'#EXT-X-MAP:URI="{base}/v1/init_live.mp4"\n'
+                f"#EXTINF:2.0,\n{base}/v1/seg_live.m4s\n"
+                "#EXT-X-DISCONTINUITY\n"
+                f'#EXT-X-MAP:URI="{base}/v1/init_ad.mp4"\n'
+                f"#EXTINF:2.0,\n{base}/v1/seg_ad.m4s\n"
+            )
+            return web.Response(body=body.encode(), content_type="application/vnd.apple.mpegurl")
+
+        up.router.add_get("/v1/playlist.m3u8", playlist_h)
+        srv = TestServer(up)
+        await srv.start_server()
+        client = await aiohttp_client(create_app(config=make_test_config()))
+        try:
+            pl_url = str(srv.make_url("/v1/playlist.m3u8"))
+            r = await client.get(f"/m3u8?u={quote(pl_url, safe='')}&track=video")
+            assert r.status == 200
+            seg_lines = [ln for ln in (await r.text()).splitlines() if "/s?" in ln and "seg_" in ln]
+            assert len(seg_lines) == 2
+
+            p1 = urlparse(seg_lines[0])
+            d1 = await (await client.get(f"{p1.path}?{p1.query}")).read()
+            mdat1 = next(
+                raw[h.header_size :] for h, raw in iter_top_level_boxes(d1) if h.type == b"mdat"
+            )
+            assert mdat1 == b"\xaa" * 200
+
+            p2 = urlparse(seg_lines[1])
+            d2 = await (await client.get(f"{p2.path}?{p2.query}")).read()
+            mdat2 = next(
+                raw[h.header_size :] for h, raw in iter_top_level_boxes(d2) if h.type == b"mdat"
+            )
+            assert mdat2 == b"\xdd" * 240
+        finally:
+            await srv.close()
+
+    async def test_concurrent_failed_fetches_do_not_leak_lock(
+        self, proxy_client: TestClient, upstream: TestServer
+    ) -> None:
+        import asyncio
+
+        from fmp4_demux_proxy.routes.segment_route import SEGMENT_LOCKS_KEY
+
+        upstream.app["status"]["/init.mp4"] = 500
+        init_url = str(upstream.make_url("/init.mp4"))
+        resps = await asyncio.gather(
+            proxy_client.get(f"/s?u={quote(init_url, safe='')}&k=init&track=video"),
+            proxy_client.get(f"/s?u={quote(init_url, safe='')}&k=init&track=audio"),
+        )
+        assert all(r.status == 502 for r in resps)
+        assert init_url not in proxy_client.app[SEGMENT_LOCKS_KEY]

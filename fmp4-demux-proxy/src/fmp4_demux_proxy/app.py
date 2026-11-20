@@ -7,9 +7,11 @@ from collections import OrderedDict
 from aiohttp import web
 
 from fmp4_demux_proxy.config import Config, get_config
+from fmp4_demux_proxy.manifest import BreakStore, MapRegistry
 from fmp4_demux_proxy.routes.health import health_handler
-from fmp4_demux_proxy.routes.m3u8_route import m3u8_handler
+from fmp4_demux_proxy.routes.m3u8_route import BREAK_STORE_KEY, m3u8_handler
 from fmp4_demux_proxy.routes.segment_route import (
+    MAP_REGISTRY_KEY,
     SEGMENT_CACHE_KEY,
     SEGMENT_LOCKS_KEY,
     TRACK_MAP_KEY,
@@ -22,6 +24,8 @@ def create_app(config: Config | None = None) -> web.Application:
     app = web.Application()
     app[CONFIG_KEY] = config if config is not None else get_config()
     app[TRACK_MAP_KEY] = OrderedDict()
+    app[MAP_REGISTRY_KEY] = MapRegistry()
+    app[BREAK_STORE_KEY] = BreakStore()
     app[SEGMENT_CACHE_KEY] = OrderedDict()
     app[SEGMENT_LOCKS_KEY] = {}
     app.cleanup_ctx.append(upstream_session_cleanup_ctx)

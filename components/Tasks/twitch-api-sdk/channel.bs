@@ -17,7 +17,7 @@ function getChannelHomeQuery() as object
     ' No stream (offline) leaves this invalid; calling ?.replace() on invalid crashes on device
     livePreviewImageUrl = invalid
     previewTemplate = channel?.stream?.previewImageURL
-    if previewTemplate <> invalid then livePreviewImageUrl = previewTemplate.replace("{width}", "320").replace("{height}", "180")
+    if previewTemplate <> invalid then livePreviewImageUrl = formatTwitchImageUrl(previewTemplate, "640", "360")
     m.top.response = {
         description: channel?.description ?? "",
         followerCount: channel?.followers?.totalCount ?? 0,

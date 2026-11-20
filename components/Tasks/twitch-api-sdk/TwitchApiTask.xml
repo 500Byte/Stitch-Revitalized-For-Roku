@@ -18,9 +18,9 @@
     <script type="text/brightscript" uri="pkg:/components/Tasks/twitch-api-sdk/browse.bs" />
     <script type="text/brightscript" uri="pkg:/components/Tasks/twitch-api-sdk/search.bs" />
     <script type="text/brightscript" uri="pkg:/components/Tasks/twitch-api-sdk/user.bs" />
-    <script type="text/brightscript" uri="pkg:/components/Tasks/twitch-api-sdk/follow.bs" />
     <script type="text/brightscript" uri="pkg:/source/utils/http.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/config.brs" />
+    <script type="text/brightscript" uri="pkg:/source/utils/authHelper.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/misc.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/analytics.brs" />
 </component>

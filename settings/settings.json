@@ -4,7 +4,7 @@
         "description": "Determines the default behavior of video quality selection when starting a stream.",
         "settingName": "playback.video.quality",
         "type": "radio",
-        "default": "auto",
+        "default": "highest",
         "options": [
             {
                 "title": "Automatic (Adjust based on network conditions)",
@@ -39,12 +39,8 @@
         "description": "Base font size for chat while watching a stream. Emotes/Badges/Etc scale based on this value.",
         "settingName": "ChatFontSize",
         "type": "radio",
-        "default": "14",
+        "default": "20",
         "options": [
-            {
-                "title": "10",
-                "id": "10"
-            },
             {
                 "title": "12",
                 "id": "12"
@@ -64,6 +60,47 @@
             {
                 "title": "20",
                 "id": "20"
+            },
+            {
+                "title": "22",
+                "id": "22"
+            },
+            {
+                "title": "24",
+                "id": "24"
+            },
+            {
+                "title": "26",
+                "id": "26"
+            },
+            {
+                "title": "28",
+                "id": "28"
+            }
+        ]
+    },
+    {
+        "title": "Chat Width",
+        "description": "Width of the chat panel on screen.",
+        "settingName": "ChatWidth",
+        "type": "radio",
+        "default": "420",
+        "options": [
+            {
+                "title": "400px (~21vw - Compact)",
+                "id": "400"
+            },
+            {
+                "title": "420px (~22vw - Standard)",
+                "id": "420"
+            },
+            {
+                "title": "480px (~25vw - Medium)",
+                "id": "480"
+            },
+            {
+                "title": "576px (30vw - Wide)",
+                "id": "576"
             }
         ]
     },
@@ -87,6 +124,13 @@
         "settingName": "FFZEmote",
         "type": "bool",
         "default": "true"
+    },
+    {
+        "title": "Auto-Skip Muted Audio Segments",
+        "description": "Automatically jump past copyright-muted audio sections in VODs (FrankerFaceZ / Trubbel style).",
+        "settingName": "AutoSkipMuted",
+        "type": "bool",
+        "default": "false"
     },
     {
         "title": "Offline Follow Sorting",

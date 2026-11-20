@@ -1,0 +1,81 @@
+namespace tests
+
+    @suite("IRC chat parser")
+    class IrcParserTests extends rooibos.BaseTestSuite
+
+        @describe("MessageParser")
+
+        @it("returns invalid for empty, invalid, or malformed messages")
+        sub rejectsMalformed()
+            m.assertInvalid(MessageParser(invalid))
+            m.assertInvalid(MessageParser(""))
+            m.assertInvalid(MessageParser("@onlytags"))
+            m.assertInvalid(MessageParser(":nick@host"))
+            m.assertInvalid(MessageParser("PRIVMSG :missingchannel"))
+            m.assertInvalid(MessageParser("UNKNOWN_CMD arg"))
+        end sub
+
+        @it("parses PRIVMSG with tags, emotes, source, and text")
+        sub parsesPrivmsg()
+            line = "@badge-info=subscriber/12;badges=subscriber/12,turbo/1;display-name=Alice;emotes=25:0-4,6-10;flags=ignored :alice!alice@alice.tmi.twitch.tv PRIVMSG #chan :Kappa Kappa hello"
+            parsed = MessageParser(line)
+            m.assertNotInvalid(parsed)
+            m.assertEqual(parsed.command.command, "PRIVMSG")
+            m.assertEqual(parsed.command.channel, "#chan")
+            m.assertEqual(parsed.source.nick, "alice")
+            m.assertEqual(parsed.tags.display_name, "Alice")
+            m.assertEqual(parsed.tags.badges, ["subscriber/12", "turbo/1"])
+            m.assertEqual(parsed.tags.emotes["25"].count(), 2)
+            m.assertEqual(parsed.parameters, "Kappa Kappa hello")
+        end sub
+
+        @it("ignores malformed emote coordinates safely")
+        sub handlesBadEmoteTags()
+            line = "@emotes=badpair;display-name=Bob :bob!bob@bob.tmi.twitch.tv PRIVMSG #chan :hi"
+            parsed = MessageParser(line)
+            m.assertNotInvalid(parsed)
+            m.assertEqual(parsed.tags.display_name, "Bob")
+            m.assertEqual(parsed.tags.emotes.count(), 0)
+        end sub
+
+        @it("parses PING and bot command prefixes")
+        sub parsesPingAndBotCommand()
+            pingMsg = MessageParser("PING :tmi.twitch.tv")
+            m.assertNotInvalid(pingMsg)
+            m.assertEqual(pingMsg.command.command, "PING")
+
+            botMsg = MessageParser(":u!u@u PRIVMSG #chan :!uptime now")
+            m.assertNotInvalid(botMsg)
+            m.assertEqual(botMsg.command.botCommand, "uptime")
+            m.assertEqual(botMsg.command.botCommandParams, "now")
+        end sub
+
+        @describe("classifyChatCommand")
+
+        @it("drops invalid, non-PRIVMSG, and timestamp-less messages and signals reconnect")
+        sub classifyCommands()
+            m.assertEqual(classifyChatCommand(invalid, false, 29, 1000).action, "drop")
+            m.assertEqual(classifyChatCommand({ command: { command: "CLEARMSG" }, tags: { tmi_sent_ts: "950000" } }, true, 29, 1000).action, "drop")
+            m.assertEqual(classifyChatCommand({ command: { command: "USERNOTICE" }, tags: { tmi_sent_ts: "950000" } }, true, 29, 1000).action, "drop")
+            m.assertEqual(classifyChatCommand({ command: { command: "PRIVMSG" }, tags: {} }, true, 29, 1000).action, "drop")
+            m.assertEqual(classifyChatCommand({ command: { command: "RECONNECT" }, tags: {} }, false, 29, 1000).action, "reconnect")
+        end sub
+
+        @it("respects delay threshold and forceLive override for PRIVMSG")
+        sub classifyDelay()
+            msg = { command: { command: "PRIVMSG" }, tags: { tmi_sent_ts: "1700000000000" } }
+            rWait = classifyChatCommand(msg, false, 29, 1700000010)
+            m.assertEqual(rWait.action, "wait")
+            m.assertEqual(rWait.age, 10)
+
+            rLive = classifyChatCommand(msg, true, 29, 1700000010)
+            m.assertEqual(rLive.action, "dispatch")
+
+            rReady = classifyChatCommand(msg, false, 29, 1700000030)
+            m.assertEqual(rReady.action, "dispatch")
+            m.assertEqual(rReady.age, 30)
+        end sub
+
+    end class
+
+end namespace

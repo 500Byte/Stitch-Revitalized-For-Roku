@@ -1,0 +1,79 @@
+namespace tests
+
+    @suite("Video recovery helpers")
+    class VideoRecoveryTests extends rooibos.BaseTestSuite
+
+        @describe("findQualityOptionIndex")
+
+        @it("finds matching quality index or defaults safely")
+        sub findIndex()
+            opts = ["1080p60", "720p60", "480p", "360p"]
+            m.assertEqual(findQualityOptionIndex(opts, "720p60"), 1)
+            m.assertEqual(findQualityOptionIndex(opts, invalid), 0)
+            m.assertEqual(findQualityOptionIndex(opts, ""), 0)
+            m.assertEqual(findQualityOptionIndex(opts, "160p"), -1)
+            m.assertEqual(findQualityOptionIndex([], "720p60"), -1)
+            m.assertEqual(findQualityOptionIndex(invalid, "720p60"), -1)
+        end sub
+
+        @describe("getNextLowerQualityIndex")
+
+        @it("steps down cleanly and stops at lowest option")
+        sub nextLower()
+            opts = ["1080p60", "720p60", "480p"]
+            m.assertEqual(getNextLowerQualityIndex(opts, "1080p60"), 1)
+            m.assertEqual(getNextLowerQualityIndex(opts, "720p60"), 2)
+            m.assertEqual(getNextLowerQualityIndex(opts, "480p"), -1)
+            m.assertEqual(getNextLowerQualityIndex(opts, "unknown"), -1)
+        end sub
+
+        @describe("getAlternativeQualityIndex")
+
+        @it("returns middle option index when > 2 options exist")
+        sub alternativeQuality()
+            m.assertEqual(getAlternativeQualityIndex(["1080p60", "720p60", "480p", "360p"]), 2)
+            m.assertEqual(getAlternativeQualityIndex(["1080p60", "720p60", "480p"]), 1)
+            m.assertEqual(getAlternativeQualityIndex(["1080p60", "720p60"]), -1)
+            m.assertEqual(getAlternativeQualityIndex(invalid), -1)
+        end sub
+
+        @describe("computeReconnectDelay")
+
+        @it("grows exponentially and caps at 16 seconds")
+        sub reconnectBackoff()
+            m.assertEqual(computeReconnectDelay(1), 1)
+            m.assertEqual(computeReconnectDelay(2), 2)
+            m.assertEqual(computeReconnectDelay(3), 4)
+            m.assertEqual(computeReconnectDelay(4), 8)
+            m.assertEqual(computeReconnectDelay(5), 16)
+            m.assertEqual(computeReconnectDelay(8), 16)
+        end sub
+
+        @describe("evaluateWatchdogTick")
+
+        @it("resets when position changes and triggers check/reconnect at stall thresholds")
+        sub watchdogProgression()
+            t0 = evaluateWatchdogTick(invalid, 10.0, 6)
+            m.assertEqual(t0.action, "reset")
+            m.assertEqual(t0.stallSeconds, 0)
+
+            t2 = evaluateWatchdogTick(10.0, 10.0, 0)
+            m.assertEqual(t2.action, "none")
+            m.assertEqual(t2.stallSeconds, 2)
+
+            t4 = evaluateWatchdogTick(10.0, 10.0, 2)
+            m.assertEqual(t4.action, "check_live")
+            m.assertEqual(t4.stallSeconds, 4)
+
+            t16 = evaluateWatchdogTick(10.0, 10.0, 14)
+            m.assertEqual(t16.action, "reconnect")
+            m.assertEqual(t16.stallSeconds, 16)
+
+            t24 = evaluateWatchdogTick(10.0, 10.0, 22)
+            m.assertEqual(t24.action, "force_reconnect")
+            m.assertEqual(t24.stallSeconds, 24)
+        end sub
+
+    end class
+
+end namespace

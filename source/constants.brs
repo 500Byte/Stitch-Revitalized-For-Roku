@@ -2,13 +2,8 @@
 sub setConstants()
     deviceInfo = CreateObject("roDeviceInfo")
     appInfo = CreateObject("roAppInfo")
-    ' Video output height (e.g. "1080p60" -> 1080), not the UI graphics plane:
-    ' a 4K stick with a 720p UI still decodes and scales 1080p video.
-    ' Capped at 1080: we only request AVC (avc1) and Roku documents AVC decoding up to 1080p,
-    ' so a 4K output must not let 1440p/2160p AVC variants through.
-    maxVideoHeight = Val(deviceInfo.GetVideoMode())
-    if maxVideoHeight <= 0 then maxVideoHeight = invalid
-    if maxVideoHeight <> invalid and maxVideoHeight > 1080 then maxVideoHeight = 1080
+    ' Video output height: allow up to 2160p / 1440p on capable 4K devices (Roku Express 4K+, etc.)
+    maxVideoHeight = 2160
     ' Sideloaded dev builds get a separate registry section so they don't share
     ' login state or settings with the channel-store install.
     appID = "StitchRevitalizedForRoku"
@@ -44,9 +39,9 @@ sub setConstants()
             ' MaskGroup maskSize is in physical pixels, not design units.
             maskScaleFactor: deviceInfo.GetUIResolution().width / 1920,
             defaultIcons: {
-                search: "pkg:/images/iconSearch.png",
-                settings: "pkg:/images/icons/sliders.png",
-                login: "pkg:/images/iconLogin.png"
+                search: "pkg:/images/icons/search.png",
+                settings: "pkg:/images/icons/settings-gear.png",
+                login: "pkg:/images/icons/sign-in.png"
             },
             menuOptions: [
                 "Browse",
@@ -59,6 +54,18 @@ sub setConstants()
                 "VideoPlayer"
             ],
             colors: {
+                semantic: {
+                    bgCanvas: "0x0E0E10FF",
+                    bgSurface: "0x18181BFF",
+                    bgOverlay: "0x1F1F23EE",
+                    bgDialog: "0x18181BFA",
+                    focusRing: "0x9146FFFF",
+                    accentLive: "0xEB0400FF",
+                    accentMute: "0xE91E63FF",
+                    textPrimary: "0xFFFFFFFF",
+                    textSecondary: "0xADADB8FF",
+                    textMuted: "0x53535FFF"
+                },
                 muted: {
                     black: "0x020202FF",
                     ice: "0xd6e4ffFF",

@@ -15,6 +15,7 @@
     </interface>
 
     <script type="text/brightscript" uri="ChatJob.brs" />
+    <script type="text/brightscript" uri="pkg:/source/utils/ircParser.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/config.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/misc.brs" />
 

@@ -1,6 +1,7 @@
 sub init()
     m.top.observeField("focusedChild", "onGetFocus")
     m.rowList = m.top.findNode("browseRowList")
+    styleRowListHeader(m.rowList)
     m.rowList.observeField("itemSelected", "onItemSelected")
     m.rowList.observeField("rowItemFocused", "onItemFocused")
 
@@ -199,7 +200,6 @@ sub insertRows(contentCollection as object, insertIndex as integer)
     m.rowList.showRowLabel = newLabels
     m.rowList.rowHeights = newHeights
     m.rowList.numRows = m.rowList.content.getChildCount()
-    m.rowList.rowLabelColor = m.global.constants.colors.twitch.purple10
     m.rowList.visible = true
 end sub
 

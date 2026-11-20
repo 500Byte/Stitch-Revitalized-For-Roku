@@ -1,13 +1,16 @@
 sub init()
     if m.global.constants <> invalid
-        m.top.backgroundColor = m.global.constants.colors.hinted.grey1
+        m.top.backgroundColor = m.global.constants.colors.semantic.bgCanvas
     end if
     m.top.observeField("focusedChild", "onGetfocus")
     m.rowlist = m.top.findNode("homeRowList")
+    styleRowListHeader(m.rowlist)
     m.rowlist.observeField("itemSelected", "handleItemSelected")
     m.username = m.top.findNode("username")
     m.followers = m.top.findNode("followers")
     m.description = m.top.findNode("description")
+    m.bioCard = m.top.findNode("bioCard")
+    m.livePill = m.top.findNode("livePill")
     m.avatar = m.top.findNode("avatar")
 end sub
 
@@ -27,6 +30,8 @@ end sub
 
 sub setBannerImage()
     bannerGroup = m.top.findNode("banner")
+    if bannerGroup = invalid then return
+    bannerGroup.removeChildrenIndex(bannerGroup.getChildCount(), 0)
     poster = createObject("roSGNode", "Poster")
     rsp = m.GetShellTask.response
     if rsp?.bannerImageUrl <> invalid
@@ -34,20 +39,24 @@ sub setBannerImage()
     else
         poster.uri = "pkg:/images/default_banner.png"
     end if
-    poster.width = m.global.constants.screenWidth
-    poster.height = 320
-    poster.scale = [1.1, 1.1]
+    poster.width = 1920
+    poster.height = 260
+    poster.loadDisplayMode = "scaleToFill"
     poster.visible = true
-    poster.translation = [0, (0 - poster.height / 3)]
+    poster.translation = [0, 0]
     bannerGroup.appendChild(poster)
 end sub
 
 sub updateChannelInfo()
     rsp = m.GetContentTask.response
     if rsp = invalid then return
-    m.description.infoText = rsp.description
-    m.followers.text = numberToText(rsp.followerCount) + " " + tr("followers")
-    if rsp.profileImageUrl <> invalid
+    desc = ""
+    if rsp.description <> invalid then desc = rsp.description.trim()
+    if m.description <> invalid then m.description.text = desc
+    if m.bioCard <> invalid then m.bioCard.visible = (desc <> "")
+    if m.livePill <> invalid then m.livePill.visible = (rsp.isLive = true)
+    if m.followers <> invalid then m.followers.text = numberToText(rsp.followerCount) + " " + tr("followers")
+    if m.avatar <> invalid and rsp.profileImageUrl <> invalid
         m.avatar.uri = rsp.profileImageUrl
     end if
     channelContent = buildContentNodeFromShelves(rsp)
@@ -95,9 +104,9 @@ function buildContentNodeFromShelves(rsp)
                 rowItem.datePublished = stream.vodCreatedAt
             end if
             if stream.previewThumbnailURL <> invalid
-                rowItem.previewImageURL = Left(stream.previewThumbnailURL, len(stream.previewThumbnailURL) - 20) + "320x180." + Right(stream.previewThumbnailURL, 3)
+                rowItem.previewImageURL = formatTwitchImageUrl(stream.previewThumbnailURL, "640", "360")
             else if stream.thumbnailURL <> invalid
-                rowItem.previewImageURL = stream.thumbnailURL
+                rowItem.previewImageURL = formatTwitchImageUrl(stream.thumbnailURL, "640", "360")
             end if
             rowItem.streamerDisplayName = m.top.contentRequested.streamerDisplayName
             rowItem.streamerLogin = m.top.contentRequested.streamerLogin
@@ -105,7 +114,9 @@ function buildContentNodeFromShelves(rsp)
             rowItem.streamerProfileImageUrl = m.top.contentRequested.streamerProfileImageUrl
             if stream.game <> invalid
                 rowItem.gameDisplayName = stream.game.displayName
-                rowItem.gameBoxArtUrl = Left(stream.game.boxArtUrl, Len(stream.game.boxArtUrl) - 20) + "188x250.jpg"
+                if stream.game.boxArtUrl <> invalid
+                    rowItem.gameBoxArtUrl = formatTwitchImageUrl(stream.game.boxArtUrl, "188", "250")
+                end if
                 rowItem.gameId = stream.game.Id
             end if
             row.appendChild(rowItem)
@@ -142,6 +153,7 @@ sub handleItemSelected()
     selectedRow = m.rowlist.content.getChild(selected[0])
     if selectedRow = invalid then return
     selectedItem = selectedRow.getChild(selected[1])
+    if selectedItem = invalid then return
     m.top.playContent = true
     m.top.contentSelected = selectedItem
 end sub
@@ -167,7 +179,7 @@ end sub
 
 sub onDestroy()
     m.top.unobserveField("focusedChild")
-    m.rowlist.unobserveField("itemSelected")
+    if m.rowlist <> invalid then m.rowlist.unobserveField("itemSelected")
     m.GetContentTask = destroyTask(m.GetContentTask, "response")
     m.GetShellTask = destroyTask(m.GetShellTask, "response")
 end sub

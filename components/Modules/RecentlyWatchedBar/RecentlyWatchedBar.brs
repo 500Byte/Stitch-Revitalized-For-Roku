@@ -8,12 +8,15 @@
 
 sub init()
     m.icon = m.top.findNode("icon")
+    m.focusTooltip = m.top.findNode("focusTooltip")
+    m.tooltipBg = m.top.findNode("tooltipBg")
+    m.tooltipLabel = m.top.findNode("tooltipLabel")
 
     ' Layout constants
-    m.itemSpacing = 60 ' px between item origins
-    m.itemStartY = 30 ' px below the icon (icon height + space 6px)
-    m.itemX = 10 ' px from bar left edge
-    m.visibleWindow = 8 ' number of items visible at once before scrolling
+    m.itemSpacing = 68 ' px between item origins
+    m.itemStartY = 58 ' px below top divider and icon
+    m.itemX = 12 ' px from bar left edge
+    m.visibleWindow = 12 ' number of items visible at once before scrolling
 
     m.items = []
     m.currentIndex = 0
@@ -49,7 +52,10 @@ sub buildItems()
     m.max = m.visibleWindow - 1
 
     history = RW_Load()
-    if history = invalid or history.Count() = 0 then return
+    if history = invalid or history.Count() = 0
+        if m.focusTooltip <> invalid then m.focusTooltip.visible = false
+        return
+    end if
 
     translationY = m.itemStartY
     index = 0
@@ -64,6 +70,8 @@ sub buildItems()
         translationY += m.itemSpacing
         index += 1
     end for
+
+    if m.focusTooltip <> invalid then m.top.appendChild(m.focusTooltip)
 
     fetchLiveStatus()
 end sub
@@ -96,7 +104,10 @@ sub onLiveStatusResponse()
         item.isLive = false
     end for
 
-    if rsp = invalid or rsp.Count() = 0 then return
+    if rsp = invalid or rsp.Count() = 0
+        updateFocusTooltip()
+        return
+    end if
 
     for each item in m.items
         data = item.itemData
@@ -107,6 +118,7 @@ sub onLiveStatusResponse()
             end if
         end if
     end for
+    updateFocusTooltip()
 end sub
 
 ' Refresh timer callback — only rebuilds when focus is not inside the bar,
@@ -118,7 +130,10 @@ end sub
 
 ' Called when heroScene sets itemHasFocus to enter or leave the bar.
 sub onFocusToggle()
-    if m.items.Count() = 0 then return
+    if m.items.Count() = 0
+        updateFocusTooltip()
+        return
+    end if
 
     if m.top.itemHasFocus
         ' Clamp index in case history shrunk since last visit
@@ -131,6 +146,7 @@ sub onFocusToggle()
             m.items[m.currentIndex].focused = false
         end if
     end if
+    updateFocusTooltip()
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
@@ -158,6 +174,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
             updateItemVisibility()
         end if
         m.items[m.currentIndex].focused = true
+        updateFocusTooltip()
         return true
 
     else if key = "down"
@@ -177,6 +194,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
             updateItemVisibility()
         end if
         m.items[m.currentIndex].focused = true
+        updateFocusTooltip()
         return true
 
     else if key = "OK"
@@ -194,6 +212,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         ' Release focus before emitting — heroScene takes it from here
         m.items[m.currentIndex].focused = false
         m.top.itemHasFocus = false
+        updateFocusTooltip()
         m.top.setFocus(false)
 
         m.top.contentSelected = content
@@ -318,6 +337,7 @@ sub rebuildKeepingFocus(keepIndex as integer)
     count = m.items.Count()
     if count = 0
         m.top.itemHasFocus = false
+        updateFocusTooltip()
         m.top.becameEmpty = true
         return
     end if
@@ -332,7 +352,45 @@ sub rebuildKeepingFocus(keepIndex as integer)
     end for
     updateItemVisibility()
     m.items[keepIndex].focused = true
+    updateFocusTooltip()
     m.top.setFocus(true)
+end sub
+
+' Displays the focused channel name (and LIVE status) beside the sidebar.
+sub updateFocusTooltip()
+    if m.focusTooltip = invalid or m.tooltipLabel = invalid or m.tooltipBg = invalid then return
+    if not m.top.itemHasFocus or m.items.Count() = 0 or m.currentIndex < 0 or m.currentIndex >= m.items.Count()
+        m.focusTooltip.visible = false
+        return
+    end if
+
+    item = m.items[m.currentIndex]
+    data = item.itemData
+    if data = invalid
+        m.focusTooltip.visible = false
+        return
+    end if
+
+    label = data.displayName
+    if label = invalid or label = "" then label = data.login
+    if label = invalid then label = ""
+    if item.isLive = true and label <> "" then label = label + "  •  LIVE"
+
+    m.tooltipLabel.width = 0
+    m.tooltipLabel.text = label
+    textW = 120
+    try
+        measured = m.tooltipLabel.boundingRect().width
+        if measured <> invalid and measured > 0 then textW = Int(measured) + 4
+    catch e
+    end try
+    if textW < 120 then textW = 120
+    if textW > 300 then textW = 300
+
+    m.tooltipLabel.width = textW
+    m.tooltipBg.width = textW + 32
+    m.focusTooltip.translation = [88, item.translation[1] + 5]
+    m.focusTooltip.visible = true
 end sub
 
 ' Show only items within the visible scroll window, hide above and below.
@@ -348,5 +406,10 @@ sub onDestroy()
     m.refreshTimer = destroyTask(m.refreshTimer, "fire")
     closeDialog()
     m.liveStatusTask = destroyTask(m.liveStatusTask, "response")
+    if m.items <> invalid
+        for each item in m.items
+            if item <> invalid then item.callFunc("onDestroy")
+        end for
+    end if
     m.top.unobserveField("itemHasFocus")
 end sub
