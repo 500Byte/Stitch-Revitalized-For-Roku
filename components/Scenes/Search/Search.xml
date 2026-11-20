@@ -1,38 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="Search" extends="SceneManagerGroup" initialFocus="keyboard">
+    <interface>
+        <function name="onDestroy" />
+    </interface>
     <script type="text/brightscript" uri="Search.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/misc.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/config.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/contentBuilder.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/taskFactory.brs" />
     <children>
+        <Poster
+            id="searchPanelBg"
+            uri="pkg:/images/capsule.9.png"
+            translation="[108, 108]"
+            width="560"
+            height="890"
+            blendColor="0x18181BFF" />
+        <Label
+            id="searchTitle"
+            translation="[132, 128]"
+            width="512"
+            text="Search"
+            color="0xFFFFFFFF">
+            <Font role="font" uri="pkg:/fonts/Archivo-Bold.otf" size="26" />
+        </Label>
         <ButtonGroup
             id="recents"
-            translation="[100, 90]"
-            minWidth="300"
-            textFont="font:SmallestSystemFont"
-            focusedTextFont="font:SmallestSystemFont"
+            translation="[132, 174]"
+            minWidth="512"
+            maxWidth="512"
+            buttonHeight="46"
+            itemSpacings="[6]"
             visible="true"
             iconUri="pkg:/images/icons/clock-o.png"
             focusedIconUri="pkg:/images/icons/clock-o.png"
-            focusFootprintBitmapUri="null"
-            focusBitmapUri="null"
+            focusFootprintBitmapUri="pkg:/images/transparent.9.png"
+            focusBitmapUri="pkg:/images/focusindicator.9.png"
         />
         <DynamicMiniKeyboard
             id="keyboard"
-            buttonheight="30"
-            translation="[100,120]" />
+            translation="[132, 174]" />
         <RowList
             id="homeRowList"
-            translation="[720, 120]"
-            rowLabelOffset="[[0,10]]"
+            translation="[704, 108]"
+            rowLabelOffset="[[0,14]]"
             rowLabelFont="font:MediumBoldSystemFont"
             itemComponentName="VideoItem"
             numRows="4"
-            rowItemSize="[[320,180]]"
-            rowItemSpacing="[[30,0]]"
-            itemSize="[1200,295]"
-            itemSpacing="[ 0, 40 ]"
+            rowItemSize="[[400,225]]"
+            rowItemSpacing="[[28,0]]"
+            itemSize="[1156,375]"
+            itemSpacing="[ 0, 20 ]"
             showRowLabel="[ true ]"
             focusBitmapUri="pkg:/images/focus_row.9.png"
             drawFocusFeedbackOnTop="true"

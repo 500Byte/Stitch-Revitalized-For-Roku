@@ -520,3 +520,28 @@ function findLoginPosition(rows as object, login as string) as dynamic
     end for
     return invalid
 end function
+
+' Clamps [row, col] focus coordinates into rowSizes (array of item counts per row).
+' Returns invalid when focused is invalid, has fewer than 2 elements, or rowSizes is empty.
+function clampRowItemFocus(focused as dynamic, rowSizes as object) as dynamic
+    if focused = invalid or type(focused) <> "roArray" or focused.count() < 2 then return invalid
+    if rowSizes = invalid or rowSizes.count() = 0 then return invalid
+    r = focused[0]
+    if r < 0 then r = 0
+    if r > rowSizes.count() - 1 then r = rowSizes.count() - 1
+    c = focused[1]
+    if c < 0 then c = 0
+    maxCol = rowSizes[r] - 1
+    if maxCol < 0 then maxCol = 0
+    if c > maxCol then c = maxCol
+    return [r, c]
+end function
+
+' Replaces Twitch {width}/{height} or %{width}/%{height} template tokens safely
+' regardless of extension length (.jpg, .jpeg, .png) or already-sized URLs.
+function formatTwitchImageUrl(url as dynamic, width as string, height as string) as string
+    if url = invalid then return ""
+    s = url.toStr().trim()
+    if s = "" then return ""
+    return s.Replace("%{width}", width).Replace("%{height}", height).Replace("{width}", width).Replace("{height}", height)
+end function

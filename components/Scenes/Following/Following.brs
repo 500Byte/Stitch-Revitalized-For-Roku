@@ -3,9 +3,21 @@ sub init()
     ? "init"; TimeStamp()
     ' m.top.observeField("itemFocused", "onGetFocus")
     m.rowlist = m.top.findNode("homeRowList")
+    styleRowListHeader(m.rowlist)
+    m.heroBackdrop = m.top.findNode("heroBackdrop")
+    m.heroLivePill = m.top.findNode("heroLivePill")
+    m.heroLiveBg = m.top.findNode("heroLiveBg")
+    m.heroLiveLabel = m.top.findNode("heroLiveLabel")
+    m.heroStreamer = m.top.findNode("heroStreamer")
+    m.heroMetaLine = m.top.findNode("heroMetaLine")
+    m.heroTitle = m.top.findNode("heroTitle")
+    m.pendingBackdropUrl = ""
+    m.heroDebounceTimer = createTimer(0.15, "applyHeroBackdrop", false)
+    if m.heroDebounceTimer <> invalid then m.heroDebounceTimer.control = "stop"
     ' m.allChannels = m.top.findNode("allChannels")
     ' m.allChannels.observeField("itemSelected", "handleItemSelected")
     m.rowlist.ObserveField("itemSelected", "handleItemSelected")
+    m.rowlist.ObserveField("rowItemFocused", "onRowItemFocused")
     m.offlineList = m.top.findNode("offlineList")
     m.loading = true
     m.lastLoad = 0
@@ -93,28 +105,15 @@ sub handleRecommendedSections()
     rsp = m.GetcontentTask.response
     if rsp = invalid then return
     try
-        if rsp <> invalid and rsp.liveFollows <> invalid and rsp.liveFollows.count() > 0
+        if rsp.liveFollows <> invalid and rsp.liveFollows.count() > 0
             row = createObject("RoSGNode", "ContentNode")
             row.title = tr("followedLiveUsers")
-            first = true
-            itemsPerRow = getStreamTile().perRow
-            appended = false
-            for i = 0 to (rsp.liveFollows.count() - 1) step 1
-                if first
-                    first = false
-                else if i mod itemsPerRow = 0
-                    row = createObject("RoSGNode", "ContentNode")
-                end if
+            for each liveItem in rsp.liveFollows
                 twitchContentNode = createObject("roSGNode", "TwitchContentNode")
-                setTwitchContentFields(twitchContentNode, rsp.liveFollows[i])
+                setTwitchContentFields(twitchContentNode, liveItem)
                 row.appendChild(twitchContentNode)
-                appended = false
-                if row.getChildCount() = itemsPerRow
-                    contentCollection.appendChild(row)
-                    appended = true
-                end if
             end for
-            if not appended and row <> invalid and row.getchildcount() > 0
+            if row.getChildCount() > 0
                 contentCollection.appendChild(row)
             end if
         end if
@@ -122,12 +121,36 @@ sub handleRecommendedSections()
         ? "[Following] handleRecommendedSections: live follows parse error: "; e
     end try
     try
+        if rsp.shelves <> invalid and rsp.shelves.count() > 0
+            shelvesAdded = 0
+            for each shelf in rsp.shelves
+                if shelf.streams = invalid or shelf.streams.count() = 0 then continue for
+                if shelf.streams[0].contentType = "GAME" then continue for
+                row = createObject("RoSGNode", "ContentNode")
+                shelfTitle = ""
+                if shelf.title <> invalid then shelfTitle = shelf.title.trim()
+                if shelfTitle = "" then shelfTitle = tr("Live Channels")
+                row.title = shelfTitle
+                for each stream in shelf.streams
+                    twitchContentNode = createObject("roSGNode", "TwitchContentNode")
+                    setTwitchContentFields(twitchContentNode, stream)
+                    row.appendChild(twitchContentNode)
+                end for
+                if row.getChildCount() > 0
+                    contentCollection.appendChild(row)
+                    shelvesAdded += 1
+                    if shelvesAdded >= 4 then exit for
+                end if
+            end for
+        end if
+    catch e
+        ? "[Following] handleRecommendedSections: recommended shelves parse error: "; e
+    end try
+    try
         ? "LiveStreamSection Complete: "; TimeStamp()
-        if rsp <> invalid and rsp.offlineFollows <> invalid and rsp.offlineFollows.count() > 0
+        if rsp.offlineFollows <> invalid and rsp.offlineFollows.count() > 0
             row = createObject("RoSGNode", "ContentNode")
             row.title = tr("followedOfflineUsers")
-            first = true
-            itemsPerRow = 9
             ? "OfflineSection Start: "; TimeStamp()
             streams = []
             streams.append(rsp.offlineFollows)
@@ -140,23 +163,12 @@ sub handleRecommendedSections()
             else if sortMethod = "ASC_followerCount"
                 streams.sortBy("followerCount")
             end if
-            appended = false
-            for i = 0 to (streams.count() - 1) step 1
-                if first
-                    first = false
-                else if i mod itemsPerRow = 0
-                    row = createObject("RoSGNode", "ContentNode")
-                end if
+            for each offlineUser in streams
                 twitchContentNode = createObject("roSGNode", "TwitchContentNode")
-                setTwitchContentFields(twitchContentNode, streams[i])
+                setTwitchContentFields(twitchContentNode, offlineUser)
                 row.appendChild(twitchContentNode)
-                appended = false
-                if row.getChildCount() = itemsPerRow
-                    contentCollection.appendChild(row)
-                    appended = true
-                end if
             end for
-            if not appended and row <> invalid and row.getchildcount() > 0
+            if row.getChildCount() > 0
                 contentCollection.appendChild(row)
             end if
             ? "OfflineStreamSection Complete: "; TimeStamp()
@@ -176,11 +188,14 @@ sub updateRowList(contentCollection)
     rowHeights = []
     for each row in contentCollection.getChildren(contentCollection.getChildCount(), 0)
         hasRowLabel = row.title <> ""
-        showRowLabel.push(hasRowLabel)
-        config = getRowConfig(row.getchild(0).contentType, hasRowLabel, true)
-        if config <> invalid
-            rowItemSize.push(config.itemSize)
-            rowHeights.push(config.rowHeight)
+        firstChild = row.getChild(0)
+        if firstChild <> invalid
+            config = getRowConfig(firstChild.contentType, hasRowLabel, false)
+            if config <> invalid
+                showRowLabel.push(hasRowLabel)
+                rowItemSize.push(config.itemSize)
+                rowHeights.push(config.rowHeight)
+            end if
         end if
     end for
     focusPos = findFocusedChannel(contentCollection)
@@ -190,7 +205,7 @@ sub updateRowList(contentCollection)
     m.rowlist.content = contentCollection
     m.rowlist.numRows = m.rowlist.content.getChildCount()
     if focusPos <> invalid then m.rowlist.jumpToRowItem = focusPos
-    m.rowlist.rowlabelcolor = m.global.constants.colors.twitch.purple10
+    updateHeroFromFocused(true)
     ? "updateRowList Done: "; TimeStamp()
 end sub
 
@@ -215,14 +230,11 @@ function findFocusedChannel(newContent as object) as dynamic
         found = findLoginPosition(rows, oldItem.streamerLogin)
         if found <> invalid then return found
     end if
-    r = focused[0]
-    if r > newContent.getChildCount() - 1 then r = newContent.getChildCount() - 1
-    c = focused[1]
-    targetRow = newContent.getChild(r)
-    if targetRow <> invalid and c > targetRow.getChildCount() - 1
-        c = targetRow.getChildCount() - 1
-    end if
-    return [r, c]
+    rowSizes = []
+    for each row in newContent.getChildren(-1, 0)
+        rowSizes.push(row.getChildCount())
+    end for
+    return clampRowItemFocus(focused, rowSizes)
 end function
 
 sub handleItemSelected()
@@ -307,11 +319,105 @@ function onKeyEvent(key as string, press as boolean) as boolean
     return false
 end function
 
+sub onRowItemFocused()
+    updateHeroFromFocused(false)
+end sub
+
+' Syncs the Apple-TV hero spotlight text and backdrop to the currently focused tile.
+sub updateHeroFromFocused(immediate = false as boolean)
+    if m.rowlist = invalid or m.rowlist.content = invalid then return
+    focused = m.rowlist.rowItemFocused
+    rowIdx = 0
+    colIdx = 0
+    if focused <> invalid and focused.count() >= 2
+        if focused[0] >= 0 then rowIdx = focused[0]
+        if focused[1] >= 0 then colIdx = focused[1]
+    end if
+    row = m.rowlist.content.getChild(rowIdx)
+    if row = invalid then return
+    item = row.getChild(colIdx)
+    if item = invalid then return
+
+    backdropUrl = ""
+    if item.contentType = "LIVE"
+        pillW = 88
+        if m.heroLiveLabel <> invalid and m.heroLiveBg <> invalid
+            badgeText = tr("LIVE")
+            if badgeText = invalid or badgeText = "" then badgeText = "LIVE"
+            m.heroLiveLabel.width = 0
+            m.heroLiveLabel.text = badgeText
+            try
+                measured = m.heroLiveLabel.boundingRect().width
+                if measured <> invalid and measured > 0 then pillW = Int(measured) + 20
+            catch e
+            end try
+            if pillW < 68 then pillW = 68
+            m.heroLiveBg.width = pillW
+            m.heroLiveLabel.width = pillW
+        end if
+        if m.heroLivePill <> invalid then m.heroLivePill.visible = true
+        if m.heroStreamer <> invalid
+            m.heroStreamer.translation = [pillW + 14, 0]
+            m.heroStreamer.text = item.streamerDisplayName
+        end if
+        if m.heroMetaLine <> invalid
+            meta = ""
+            if item.gameDisplayName <> invalid and item.gameDisplayName.trim() <> ""
+                meta = item.gameDisplayName.trim()
+            end if
+            if item.viewersDisplay <> invalid and item.viewersDisplay.trim() <> ""
+                if meta <> "" then meta += "  ·  "
+                meta += item.viewersDisplay.trim()
+            end if
+            m.heroMetaLine.text = meta
+        end if
+        if m.heroTitle <> invalid then m.heroTitle.text = item.contentTitle
+        if item.previewImageURL <> invalid then backdropUrl = item.previewImageURL
+    else
+        if m.heroLivePill <> invalid then m.heroLivePill.visible = false
+        if m.heroStreamer <> invalid
+            m.heroStreamer.translation = [0, 0]
+            streamerName = item.streamerDisplayName
+            if streamerName = invalid or streamerName = "" then streamerName = item.contentTitle
+            if streamerName = invalid then streamerName = ""
+            m.heroStreamer.text = streamerName
+        end if
+        if m.heroMetaLine <> invalid
+            meta = tr("Offline Channels")
+            if item.followerDisplay <> invalid and item.followerDisplay.trim() <> ""
+                meta += "  ·  " + item.followerDisplay.trim()
+            end if
+            m.heroMetaLine.text = meta
+        end if
+        if m.heroTitle <> invalid then m.heroTitle.text = ""
+        if item.streamerProfileImageUrl <> invalid then backdropUrl = item.streamerProfileImageUrl
+    end if
+
+    m.pendingBackdropUrl = backdropUrl
+    if immediate
+        applyHeroBackdrop()
+    else if m.heroDebounceTimer <> invalid
+        m.heroDebounceTimer.control = "stop"
+        m.heroDebounceTimer.control = "start"
+    else
+        applyHeroBackdrop()
+    end if
+end sub
+
+sub applyHeroBackdrop()
+    if m.heroBackdrop = invalid then return
+    if m.pendingBackdropUrl <> invalid
+        m.heroBackdrop.uri = m.pendingBackdropUrl
+    end if
+end sub
+
 sub onDestroy()
     m.top.unobserveField("focusedChild")
     if m.rowlist <> invalid
         m.rowlist.unobserveField("itemSelected")
+        m.rowlist.unobserveField("rowItemFocused")
     end if
+    m.heroDebounceTimer = destroyTask(m.heroDebounceTimer, "fire")
     m.GetContentTask = destroyTask(m.GetContentTask, "response")
     if m.refreshTimer <> invalid
         m.refreshTimer.control = "stop"

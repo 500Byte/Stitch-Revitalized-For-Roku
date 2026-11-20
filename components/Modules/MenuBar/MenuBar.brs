@@ -12,18 +12,14 @@ sub init()
     constants = m.global.constants
     m.screenWidth = 1920
     if constants <> invalid then m.screenWidth = constants.screenWidth
-    m.iconRightPadding = 24
+    m.iconRightPadding = 60
 
     '*******************'
-    '* Per-group focus bitmap URIs. Each ButtonGroup uses a different
-    '* focus image (text buttons get an underline indicator, icon buttons
-    '* get a footprint). We toggle focusBitmapUri on each Button to either
-    '* the real image (when its group is focused) or a transparent 9-patch
-    '* (when its group is not). Setting the URI to "" leaves the previously
-    '* loaded bitmap cached on screen, so a real (transparent) image is used
-    '* to forcibly clear the rendered focus indicator.
+    '* Per-group focus bitmap URIs. Both groups use the bottom underline
+    '* bitmap when active, and a transparent 9-patch when inactive so
+    '* Roku does not keep rendering a stale cached focus bitmap.
     '*******************'
-    m.menuOptionsFocusUri = "pkg:/images/focusindicator.9.png"
+    m.menuOptionsFocusUri = "pkg:/images/focusfootprint.9.png"
     m.iconOptionsFocusUri = "pkg:/images/focusfootprint.9.png"
     m.transparentFocusUri = "pkg:/images/transparent.9.png"
 
@@ -43,8 +39,8 @@ sub init()
     m.iconOptions.observeField("buttonSelected", "onIconOptionsSelected")
 
     if constants <> invalid
-        m.top.menuTextColor = constants.colors.muted.ice
-        m.top.menuFocusColor = constants.colors.twitch.purple10
+        m.top.menuTextColor = constants.colors.semantic.textSecondary
+        m.top.menuFocusColor = constants.colors.semantic.textPrimary
     end if
 end sub
 
@@ -148,12 +144,14 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if key = "right" and focused.id = "MenuOptions"
         if m.iconOptions.getChildCount() > 0
             m.iconOptions.focusButton = 0
+            m.iconOptions.setFocus(true)
             return true
         end if
     else if key = "left" and focused.id = "IconOptions"
         last = m.menuOptions.getChildCount() - 1
         if last >= 0
             m.menuOptions.focusButton = last
+            m.menuOptions.setFocus(true)
             return true
         end if
     end if
@@ -161,28 +159,42 @@ function onKeyEvent(key as string, press as boolean) as boolean
 end function
 
 function buildIcon(icon)
+    key = LCase(icon)
+    defaultLogin = m.global.constants.defaultIcons.login
     map = {
         "search": m.global.constants.defaultIcons.search,
         "settings": m.global.constants.defaultIcons.settings,
-        "loginpage": get_user_setting("profile_image_url", m.global.constants.defaultIcons.login)
+        "loginpage": get_user_setting("profile_image_url", defaultLogin)
     }
+    iconUri = map[key]
+    isAvatar = (key = "loginpage" and iconUri <> invalid and iconUri <> "" and iconUri <> defaultLogin)
+    iconSize = 32
+    if isAvatar then iconSize = 36
+
     newItem = createObject("roSGNode", "Button")
     newItem.id = icon
     newItem.textColor = m.top.menuTextColor
     newItem.focusedTextColor = m.top.menuTextColor
-    newItem.iconUri = map[icon]
-    newItem.focusedIconUri = map[icon]
+    newItem.iconUri = iconUri
+    newItem.focusedIconUri = iconUri
     newItem.minWidth = 0
     newItem.height = 64
-    newItem.focusFootprintBitmapUri = "pkg:/images/focusfootprint.9.png"
-    newItem.focusBitmapUri = "pkg:/images/focusfootprint.9.png"
+    newItem.focusFootprintBitmapUri = m.transparentFocusUri
+    newItem.focusBitmapUri = m.iconOptionsFocusUri
     newItem.showFocusFootprint = false
-    newItem.getchild(3).blendColor = m.top.menuTextColor
-    newItem.getchild(3).width = m.top.menuFontSize * 2
-    newItem.getchild(3).height = m.top.menuFontSize * 2
-    newItem.getchild(4).blendColor = m.top.menuFocusColor
-    newItem.getchild(4).width = m.top.menuFontSize * 2
-    newItem.getchild(4).height = m.top.menuFontSize * 2
+    if newItem.getChildCount() > 4
+        if isAvatar
+            newItem.getChild(3).blendColor = "0xFFFFFFFF"
+            newItem.getChild(4).blendColor = "0xFFFFFFFF"
+        else
+            newItem.getChild(3).blendColor = m.top.menuTextColor
+            newItem.getChild(4).blendColor = "0x9146FFFF"
+        end if
+        newItem.getChild(3).width = iconSize
+        newItem.getChild(3).height = iconSize
+        newItem.getChild(4).width = iconSize
+        newItem.getChild(4).height = iconSize
+    end if
     return newItem
 end function
 
@@ -204,7 +216,7 @@ sub updateMenuOptions()
     clearGroup(m.menuOptions)
     clearGroup(m.iconOptions)
 
-    m.menuOptions.translation = [78, 0]
+    m.menuOptions.translation = [104, 8]
 
     '*******************'
     '* Build text buttons -> MenuOptions (left-anchored)
@@ -216,7 +228,7 @@ sub updateMenuOptions()
             font = CreateObject("roSGNode", "Font")
             font.size = m.top.menuFontSize
             font.uri = m.top.menuFontUri
-            newItem.minWidth = 245
+            newItem.minWidth = 180
             newItem.height = 64
             newItem.textFont = font
             newItem.focusedTextFont = font
@@ -224,8 +236,8 @@ sub updateMenuOptions()
             newItem.focusedTextColor = m.top.menuFocusColor
             newItem.iconUri = ""
             newItem.focusedIconUri = ""
-            newItem.focusFootprintBitmapUri = "pkg:/images/focusfootprint.9.png"
-            newItem.focusBitmapUri = "pkg:/images/focusindicator.9.png"
+            newItem.focusFootprintBitmapUri = m.transparentFocusUri
+            newItem.focusBitmapUri = m.menuOptionsFocusUri
             newItem.showFocusFootprint = false
             newItem.id = m.top.menuOptionsText[i]
             newItem.text = tr(m.top.menuOptionsText[i])
@@ -274,14 +286,12 @@ sub positionIconOptions()
         width = 0
     end try
     if width <= 0
-        ' Fallback: estimate based on icon size when boundingRect is unavailable.
-        ' Each icon button is ~ menuFontSize * 2 wide plus button chrome (~16px).
-        perIcon = (m.top.menuFontSize * 2) + 16
+        perIcon = 56
         width = m.iconOptions.getChildCount() * perIcon
     end if
     x = m.screenWidth - m.iconRightPadding - width
     if x < 0 then x = 0
-    m.iconOptions.translation = [x, 0]
+    m.iconOptions.translation = [x, 8]
 end sub
 
 sub handleUserLoginResponse()
@@ -295,8 +305,17 @@ sub handleUserLoginResponse()
         end for
         avatar = m.iconOptions.findNode("LoginPage")
         if avatar <> invalid
-            avatar.iconUri = get_user_setting("profile_image_url")
-            avatar.focusedIconUri = get_user_setting("profile_image_url")
+            profileUrl = get_user_setting("profile_image_url")
+            avatar.iconUri = profileUrl
+            avatar.focusedIconUri = profileUrl
+            if profileUrl <> invalid and profileUrl <> "" and avatar.getChildCount() > 4
+                avatar.getChild(3).blendColor = "0xFFFFFFFF"
+                avatar.getChild(4).blendColor = "0xFFFFFFFF"
+                avatar.getChild(3).width = 36
+                avatar.getChild(3).height = 36
+                avatar.getChild(4).width = 36
+                avatar.getChild(4).height = 36
+            end if
             m.top.updateUserIcon = false
         end if
     end if
@@ -318,6 +337,14 @@ sub handleUserLogin()
             if avatar <> invalid
                 avatar.iconUri = m.global.constants.defaultIcons.login
                 avatar.focusedIconUri = m.global.constants.defaultIcons.login
+                if avatar.getChildCount() > 4
+                    avatar.getChild(3).blendColor = m.top.menuTextColor
+                    avatar.getChild(4).blendColor = "0x9146FFFF"
+                    avatar.getChild(3).width = 32
+                    avatar.getChild(3).height = 32
+                    avatar.getChild(4).width = 32
+                    avatar.getChild(4).height = 32
+                end if
                 m.top.updateUserIcon = false
             end if
         end if

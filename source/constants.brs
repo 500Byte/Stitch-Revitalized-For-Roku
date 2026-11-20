@@ -39,9 +39,9 @@ sub setConstants()
             ' MaskGroup maskSize is in physical pixels, not design units.
             maskScaleFactor: deviceInfo.GetUIResolution().width / 1920,
             defaultIcons: {
-                search: "pkg:/images/iconSearch.png",
-                settings: "pkg:/images/icons/sliders.png",
-                login: "pkg:/images/iconLogin.png"
+                search: "pkg:/images/icons/search.png",
+                settings: "pkg:/images/icons/settings-gear.png",
+                login: "pkg:/images/icons/sign-in.png"
             },
             menuOptions: [
                 "Browse",

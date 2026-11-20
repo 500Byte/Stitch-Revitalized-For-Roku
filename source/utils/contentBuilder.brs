@@ -16,25 +16,25 @@ function getRowConfig(contentType, hasRowLabel as boolean, tallRows = false as b
 
     if contentType = "LIVE" or contentType = "VOD" or contentType = "CLIP"
         tile = getStreamTile()
-        ' Room below the poster for title + subtitle, plus the row label.
-        rowHeight = tile.height + 60
-        if hasRowLabel then rowHeight += 40
-        if tallRows then rowHeight += 20
+        ' Room below the poster for 3-line metadata (title, streamer, category), plus row label.
+        rowHeight = tile.height + 105
+        if hasRowLabel then rowHeight += 45
+        if tallRows then rowHeight += 15
         return { itemSize: [tile.width, tile.height], rowHeight: rowHeight }
     end if
 
     if contentType = "GAME"
         if hasRowLabel
-            rowHeight = 325
+            rowHeight = 365
         else
-            rowHeight = 305
+            rowHeight = 325
         end if
         return { itemSize: [188, 250], rowHeight: rowHeight }
     end if
 
     if contentType = "USER"
         if hasRowLabel
-            rowHeight = 260
+            rowHeight = 280
         else
             rowHeight = 240
         end if
@@ -43,3 +43,14 @@ function getRowConfig(contentType, hasRowLabel as boolean, tallRows = false as b
 
     return invalid
 end function
+
+' Applies consistent LG-TV typography and spacing to RowList section headers.
+sub styleRowListHeader(rowList as object)
+    if rowList = invalid then return
+    font = CreateObject("roSGNode", "Font")
+    font.uri = "pkg:/fonts/Archivo-Bold.otf"
+    font.size = 28
+    rowList.rowLabelFont = font
+    rowList.rowLabelColor = "0xFFFFFFFF"
+    rowList.rowLabelOffset = [[0, 14]]
+end sub

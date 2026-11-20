@@ -129,3 +129,23 @@ Directamente debajo de la seekbar (Y ~ 890px), la fila inferior se divide en dos
   - `maxWidth` del título se recalcula dinámicamente (`buttonsX - 176px`) evitando cualquier solapamiento.
   - El badge `LIVE` se alinea a `[videoWidth - 270, 48]`.
 
+---
+
+## 7. Vistas de Navegación, Tarjetas y Utilidades (Estilo LG TV)
+
+Las pantallas fuera del reproductor heredan los mismos tokens, márgenes TV (`1920 × 1080`) y tipografía `Archivo` del módulo de reproducción:
+
+- **Barra superior (`MenuBar`, `80px`):** Fondo `0x121215FF`, divisor `1px` `0x26262CFF`, badge de marca `"S"` morado (`[20, 21]`), pestañas en `24px Archivo-Bold` (`textSecondary` -> `textPrimary` + subrayado morado) e iconos Lucide de `32px` con margen derecho de safe-zone `60px` (y avatar de usuario sin tintado a `36px`).
+- **Sidebar lateral (`RecentlyWatchedBar`, `78px × 1000px` debajo del header):** Fondo `0x121215FF` + borde derecho `1px` `0x26262CFF`, `54px` avatares en paso vertical `68px` y tooltip flotante (`capsule.9.png`, `18px Archivo-Bold`) mostrando el nombre del canal enfocado y su estado `LIVE`.
+- **Home (`Following`, Hero Spotlight + Estantes Horizontales):**
+  - Zona Hero superior (`380px`, `heroBackdrop` atenuado + scrims superior/inferior) actualizada con debounce `0.15s` según el elemento enfocado: pill `LIVE` adaptativa, streamer (`24px Archivo-Bold`), categoría · espectadores (`20px Archivo-Regular`) y título completo a 2 líneas (`36px Archivo-Bold`).
+  - Carruseles horizontales continuos: seguidos en vivo, hasta 4 filas recomendadas (sin shelves `GAME`) y seguidos sin conexión en una fila horizontal debajo (`translation: [104, 424]`, `numRows="2"`).
+- **Tarjetas y RowList (`VideoItem` + `contentBuilder`):**
+  - Miniatura `400 × 225px` (16:9, resuelta vía `formatTwitchImageUrl()` en `640×360` para VODs/clips), badge `LIVE` en cápsula roja con ancho medido dinámicamente (`16px Archivo-Bold`), píldoras de viewers / fecha relativa en cápsula oscura (`16px Archivo-Bold`).
+  - Fila inferior con avatar circular `48 × 48px` (cuando existe `streamerProfileImageUrl`) y jerarquía a 3 líneas: título en `20px Archivo-Bold`, streamer en `18px Archivo-Regular` (`0xDEDEE3FF`) y categoría en `17px Archivo-Regular` (`textSecondary`). Los títulos de `GAME` y `USER` usan `Label` nativo (`plainTitle`, `20px Archivo-Bold`) para evitar clipping.
+  - Encabezados de sección unificados vía `styleRowListHeader()` (`28px Archivo-Bold` blanco, offset `[0, 14]`).
+- **Vistas secundarias:**
+  - `ChannelPage`: Banner `1920 × 260px` con scrim inferior, avatar `136 × 136px` (`width: 300`), cápsula `LIVE` (`96×28px`), bio en tarjeta custom (`0x18181BE6`, `20px`, máximo 3 líneas) y grillas dentro de safe-zone `64px`.
+  - `GamePage`: Cabecera `176px` (`0x141418FF`) con carátula `84 × 112px`, título `40px Archivo-Bold` y subtítulo de audiencia (`20px`).
+  - `Settings`, `Search`, `LoginPage`: Tarjetas `0x18181BFF` con bordes `0x26262CFF`, foco en cápsula `0x9146FFFF`, tipografía mínima `18-20px Archivo` y marco blanco de alto contraste para el QR de activación (`LoginPage`).
+

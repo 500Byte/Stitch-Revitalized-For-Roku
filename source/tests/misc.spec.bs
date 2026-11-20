@@ -508,6 +508,50 @@ namespace tests
             m.assertInvalid(findLoginPosition([["a"]], ""))
         end sub
 
+        '+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        @describe("clampRowItemFocus")
+        '+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+        @it("returns invalid when focused is invalid, short, or rowSizes is empty")
+        sub clampRowItemFocus_invalid()
+            m.assertInvalid(clampRowItemFocus(invalid, [3, 2]))
+            m.assertInvalid(clampRowItemFocus([0], [3, 2]))
+            m.assertInvalid(clampRowItemFocus([0, 0], []))
+        end sub
+
+        @it("clamps out-of-range coordinates into rowSizes")
+        sub clampRowItemFocus_clamps()
+            m.assertEqual(clampRowItemFocus([1, 1], [3, 4]), [1, 1])
+            m.assertEqual(clampRowItemFocus([5, 9], [3, 2]), [1, 1])
+            m.assertEqual(clampRowItemFocus([-1, -2], [3, 2]), [0, 0])
+        end sub
+
+        '+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        @describe("formatTwitchImageUrl")
+        '+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+        @it("replaces {width}x{height} on .jpeg and .png templates without mangling extensions")
+        sub formatTwitchImageUrl_curlyTokens()
+            tpl = "https://static-cdn.jtvnw.net/cf_vods/abc/thumb/custom-{width}x{height}.jpeg"
+            m.assertEqual(formatTwitchImageUrl(tpl, "640", "360"), "https://static-cdn.jtvnw.net/cf_vods/abc/thumb/custom-640x360.jpeg")
+            tpl404 = "https://vod-secure.twitch.tv/_404/404_processing_{width}x{height}.png"
+            m.assertEqual(formatTwitchImageUrl(tpl404, "640", "360"), "https://vod-secure.twitch.tv/_404/404_processing_640x360.png")
+        end sub
+
+        @it("replaces %{width}x%{height} tokens and preserves resolved URLs")
+        sub formatTwitchImageUrl_percentAndResolved()
+            boxTpl = "https://static-cdn.jtvnw.net/ttv-boxart/509658-%{width}x%{height}.jpg"
+            m.assertEqual(formatTwitchImageUrl(boxTpl, "188", "250"), "https://static-cdn.jtvnw.net/ttv-boxart/509658-188x250.jpg")
+            resolved = "https://static-cdn.jtvnw.net/clip/thumb-1920x1080.jpg"
+            m.assertEqual(formatTwitchImageUrl(resolved, "640", "360"), resolved)
+        end sub
+
+        @it("returns empty string for invalid or empty input")
+        sub formatTwitchImageUrl_empty()
+            m.assertEqual(formatTwitchImageUrl(invalid, "640", "360"), "")
+            m.assertEqual(formatTwitchImageUrl("", "640", "360"), "")
+        end sub
+
     end class
 
 end namespace

@@ -1,15 +1,45 @@
 sub init()
-    m.top.backgroundColor = m.global.constants.colors.hinted.grey1
+    if m.global <> invalid and m.global.constants <> invalid
+        m.top.backgroundColor = m.global.constants.colors.semantic.bgCanvas
+    end if
     m.top.observeField("focusedChild", "onGetfocus")
-    ' m.top.observeField("itemFocused", "onGetFocus")
     m.rowlist = m.top.findNode("homeRowList")
+    styleRowListHeader(m.rowlist)
     m.rowlist.ObserveField("itemSelected", "handleItemSelected")
+    m.header = m.top.findNode("Header")
+    m.subtitle = m.top.findNode("subtitle")
+    m.gameBoxArt = m.top.findNode("gameBoxArt")
 end sub
 
 sub updatePage()
-    m.top.pageTitle = m.top.contentRequested.gameName
+    req = m.top.contentRequested
+    if req = invalid then return
+
+    title = req.gameDisplayName
+    if title = invalid or title = "" then title = req.gameName
+    if title = invalid then title = ""
+    m.top.pageTitle = title
+
+    boxArtUrl = req.gameBoxArtUrl
+    hasBoxArt = (boxArtUrl <> invalid and boxArtUrl <> "")
+    if m.gameBoxArt <> invalid
+        m.gameBoxArt.visible = hasBoxArt
+        if hasBoxArt then m.gameBoxArt.uri = boxArtUrl
+    end if
+    textX = 64
+    if hasBoxArt then textX = 172
+    if m.header <> invalid then m.header.translation = [textX, 46]
+    if m.subtitle <> invalid
+        m.subtitle.translation = [textX, 100]
+        if req.viewersDisplay <> invalid and req.viewersDisplay <> ""
+            m.subtitle.text = req.viewersDisplay
+        else
+            m.subtitle.text = tr("Live Channels")
+        end if
+    end if
+
     m.GetContentTask = createApiTask("getGameDirectoryQuery", "handleRecommendedSections", {
-        params: { gameAlias: m.top.contentRequested.gameName }
+        params: { gameAlias: req.gameName }
     })
 end sub
 
@@ -17,6 +47,12 @@ function buildContentNodeFromShelves(streams)
     itemsPerRow = getStreamTile().perRow
     contentCollection = createObject("RoSGNode", "ContentNode")
     row = createObject("RoSGNode", "ContentNode")
+    gameTitle = ""
+    if m.top.contentRequested <> invalid
+        gameTitle = m.top.contentRequested.gameDisplayName
+        if gameTitle = invalid or gameTitle = "" then gameTitle = m.top.contentRequested.gameName
+        if gameTitle = invalid then gameTitle = ""
+    end if
     for i = 0 to (streams.count() - 1) step 1
         stream = streams[i]
         if stream = invalid or stream.node = invalid or stream.node.broadcaster = invalid then continue for
@@ -31,7 +67,7 @@ function buildContentNodeFromShelves(streams)
         rowItem.streamerLogin = stream.node.broadcaster.login
         rowItem.streamerId = stream.node.broadcaster.id
         rowItem.streamerProfileImageUrl = stream.node.broadcaster.profileImageURL
-        ' rowItem.gameDisplayName = stream.node.game.displayName
+        rowItem.gameDisplayName = gameTitle
         ' rowItem.Title = stream.node.broadcaster.broadcastsettings.title
         ' rowItem.secondaryTitle = stream.node.broadcaster.displayName
         ' rowItem.HDPosterUrl = Substitute("https://static-cdn.jtvnw.net/previews-ttv/live_user_{0}-{1}x{2}.jpg", stream.node.broadcaster.login, "1280", "720")
@@ -84,7 +120,9 @@ sub handleItemSelected()
     if m.rowlist.rowItemSelected = invalid then return
     if m.rowlist.rowItemSelected.count() < 2 then return
     selectedRow = m.rowlist.content.getchild(m.rowlist.rowItemSelected[0])
+    if selectedRow = invalid then return
     selectedItem = selectedRow.getChild(m.rowlist.rowItemSelected[1])
+    if selectedItem = invalid then return
     m.top.contentSelected = selectedItem
 end sub
 
@@ -113,3 +151,11 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     return false
 end function
+
+sub onDestroy()
+    m.top.unobserveField("focusedChild")
+    if m.rowlist <> invalid
+        m.rowlist.unobserveField("itemSelected")
+    end if
+    m.GetContentTask = destroyTask(m.GetContentTask, "response")
+end sub

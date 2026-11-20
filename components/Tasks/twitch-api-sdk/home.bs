@@ -95,22 +95,27 @@ namespace api.twitch.home
                                     }
                                     if stream.node.game <> invalid
                                         item.gameDisplayName = stream.node.game.displayName
-                                        item.gameBoxArtUrl = Left(stream.node.game.boxArtUrl, Len(stream.node.game.boxArtUrl) - 20) + "188x250.jpg"
+                                        if stream.node.game.boxArtUrl <> invalid
+                                            item.gameBoxArtUrl = formatTwitchImageUrl(stream.node.game.boxArtUrl, "188", "250")
+                                        end if
                                         item.gameId = stream.node.game.Id
                                         item.gameName = stream.node.game.name
                                     end if
                                     streams.push(item)
                                 else if typeName <> invalid and typeName.toStr() = "Game"
-                                    streams.push({
+                                    gameItem = {
                                         contentId: stream.node.Id,
                                         contentType: ContentType.GAME,
                                         viewersCount: stream.node.viewersCount,
                                         gameDisplayName: stream.node.displayName,
-                                        gameBoxArtUrl: Left(stream.node.boxArtUrl, Len(stream.node.boxArtUrl) - 20) + "188x250.jpg",
                                         gameId: stream.node.Id,
                                         gameName: stream.node.name,
                                         contentTitle: stream.node.displayName
-                                    })
+                                    }
+                                    if stream.node.boxArtUrl <> invalid
+                                        gameItem.gameBoxArtUrl = formatTwitchImageUrl(stream.node.boxArtUrl, "188", "250")
+                                    end if
+                                    streams.push(gameItem)
                                 end if
                             end if
                         catch e
@@ -155,7 +160,9 @@ namespace api.twitch.home
                 }
                 if stream.game <> invalid
                     item.gameDisplayName = stream.game.displayName
-                    item.gameBoxArtUrl = Left(stream.game.boxArtUrl, Len(stream.game.boxArtUrl) - 20) + "188x250.jpg"
+                    if stream.game.boxArtUrl <> invalid
+                        item.gameBoxArtUrl = formatTwitchImageUrl(stream.game.boxArtUrl, "188", "250")
+                    end if
                     item.gameId = stream.game.Id
                     item.gameName = stream.game.name
                 end if
@@ -196,37 +203,3 @@ namespace api.twitch.home
     end function
 
 end namespace
-
-function getRecommendedSections() as object
-    rsp = TwitchGraphQLRequest({
-        operationName: "Shelves",
-        variables: {
-            "imageWidth": 50,
-            "itemsPerRow": 3,
-            "platform": "web",
-            "limit": 8,
-            "requestID": getRandomUUID(),
-            "context": {
-                "clientApp": "twilight",
-                "location": "home",
-                "referrerDomain": "twitch.tv",
-                "viewportHeight": 1080,
-                "viewportWidth": 1920
-            },
-            "verbose": false
-        },
-        extensions: {
-            persistedQuery: {
-                version: 1,
-                sha256Hash: "b6f0c72c747457b73107f6aa00bd6a5bb294539d2de5398646e949c863662543"
-            }
-        }
-    })
-    if rsp <> invalid
-        m.top.response = rsp
-    else
-        m.top.response = { "response": invalid }
-    end if
-    m.top.control = TaskControl.STOP
-    return invalid
-end function

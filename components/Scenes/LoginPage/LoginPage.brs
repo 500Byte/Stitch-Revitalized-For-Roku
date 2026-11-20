@@ -1,9 +1,13 @@
 sub init()
     m.top.observeField("itemHasFocus", "onGetfocus")
+    m.loginHeader = m.top.findNode("loginHeader")
+    if m.loginHeader <> invalid then m.loginHeader.text = tr("Login")
+    m.codeBox = m.top.findNode("codeBox")
     m.code = m.top.findNode("code")
     m.loginText = m.top.findNode("topText")
     m.bottomText = m.top.findNode("bottomText")
     m.buttonGroup = m.top.findNode("buttonGroup")
+    m.qrFrame = m.top.findNode("qrFrame")
     m.qrCode = m.top.findNode("qrCode")
     RunContentTask()
 end sub
@@ -34,12 +38,8 @@ sub handleUserLogin()
         set_user_setting("login", currentUser.login)
         set_user_setting("access_token", access_token)
         set_user_setting("device_code", device_code)
-        ' TODO: Yet again with the static reference that should be fixed.
-        ' Parent = heroScene, child 1 = MenuBar, child 3 = ButtonGroup, child 6 = loginIconButton
-        ?"Set finished true"
         m.top.finished = true
     end if
-    RunContentTask()
 end sub
 
 sub getUserLogin()
@@ -103,15 +103,18 @@ sub RunContentTask()
     else
         ? "[LoginPage] - RunContentTask"
         m.code.visible = true
+        if m.codeBox <> invalid then m.codeBox.visible = true
         m.loginText.visible = true
         m.bottomText.visible = true
         m.buttonGroup.visible = false
         m.qrCode.visible = true
+        if m.qrFrame <> invalid then m.qrFrame.visible = true
         m.RendezvouzTask = createApiTask("getRendezvouzToken", "handleRendezvouzToken")
     end if
 end sub
 
 sub onDestroy()
+    m.top.unobserveField("itemHasFocus")
     if m.qrCode <> invalid
         m.qrCode.unobserveField("loadStatus")
     end if

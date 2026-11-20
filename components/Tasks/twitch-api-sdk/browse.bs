@@ -39,7 +39,7 @@ namespace api.twitch.browse
                         gameName: node.name
                     }
                     if node.boxArtURL <> invalid and node.boxArtURL <> ""
-                        item.gameBoxArtUrl = Left(node.boxArtURL, Len(node.boxArtURL) - 20) + "188x250.jpg"
+                        item.gameBoxArtUrl = formatTwitchImageUrl(node.boxArtURL, "188", "250")
                     end if
                     games.push(item)
                 end if
