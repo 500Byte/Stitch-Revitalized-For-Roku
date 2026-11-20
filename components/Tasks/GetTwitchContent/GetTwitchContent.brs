@@ -15,42 +15,33 @@ sub main()
         contentFields.delete("focusedChild")
         content.setFields(contentFields)
 
-        ' Try to get a working clip URL with enhanced method
-        workingUrl = findWorkingClipUrl(clipSlug, m.top.contentRequested.previewImageUrl)
-
-        if workingUrl <> invalid and workingUrl <> ""
-            content.url = workingUrl
-            content.StreamUrls = [workingUrl]
-            ' Use boolean to stay consistent with the live/VOD metadata schema
-            if content.streamQualities = invalid
-                content.streamQualities = []
-            end if
-            content.streamQualities.push(true)
+        ' Fetch official signed clip URL via GraphQL first; fall back to probing legacy URLs only if needed
+        clipUrl = getClipUrlViaGraphQL(clipSlug)
+        if clipUrl <> invalid and clipUrl <> ""
+            content.url = clipUrl
+            content.StreamUrls = [clipUrl]
+            content.streamQualities = [true]
             content.streamContentIds = ["Original"]
-            ' ? "[GetTwitchContent] Using verified clip URL: "; workingUrl
         else
-            ' ? "[GetTwitchContent] URL verification failed, trying GraphQL approach"
-            ' Try to get clip info via GraphQL first
-            clipUrl = getClipUrlViaGraphQL(clipSlug)
-            if clipUrl <> invalid and clipUrl <> ""
-                content.url = clipUrl
-                content.StreamUrls = [clipUrl]
-                content.streamQualities = ["HD"]
+            workingUrl = findWorkingClipUrl(clipSlug, m.top.contentRequested.previewImageUrl)
+            if workingUrl <> invalid and workingUrl <> ""
+                content.url = workingUrl
+                content.StreamUrls = [workingUrl]
+                if content.streamQualities = invalid
+                    content.streamQualities = []
+                end if
+                content.streamQualities.push(true)
                 content.streamContentIds = ["Original"]
-                ' ? "[GetTwitchContent] Using GraphQL clip URL: "; clipUrl
             else
-                ' ? "[GetTwitchContent] GraphQL failed, using enhanced fallback"
-                ' Enhanced fallback with multiple attempts
                 fallbackUrls = generateClipFallbackUrls(clipSlug, m.top.contentRequested.previewImageUrl)
                 content.url = fallbackUrls[0]
                 content.StreamUrls = fallbackUrls
                 content.streamQualities = []
                 content.streamContentIds = []
                 for i = 0 to fallbackUrls.Count() - 1
-                    content.streamQualities.push("HD")
+                    content.streamQualities.push(true)
                     content.streamContentIds.push("Fallback_" + i.toStr())
                 end for
-                ' ? "[GetTwitchContent] Using fallback URLs, primary: "; fallbackUrls[0]
             end if
         end if
 
@@ -60,8 +51,9 @@ sub main()
     else
         rsp = invalid
         if m.top.contentRequested.contentType = "VOD"
+            vodQuery = ReadAsciiFile("pkg:/source/graphql/VodPlayerWrapper_Query.gql")
             rsp = TwitchGraphQLRequest({
-                query: "query VodPlayerWrapper_Query($videoId: ID!, $platform: String!, $playerType: String!, $skipPlayToken: Boolean!) { ...VodPlayerWrapper_token } fragment VodPlayerWrapper_token on Query { video(id: $videoId) @skip(if: $skipPlayToken) { playbackAccessToken(params: {platform: $platform, playerType: $playerType}) { signature value } id __typename } }",
+                query: vodQuery,
                 variables: {
                     "videoId": m.top.contentRequested.contentId,
                     "platform": "web_tv",
@@ -72,8 +64,9 @@ sub main()
 
         end if
         if m.top.contentRequested.contentType = "LIVE"
+            streamQuery = ReadAsciiFile("pkg:/source/graphql/StreamPlayer_Query.gql")
             rsp = TwitchGraphQLRequest({
-                query: "query StreamPlayer_Query($login: String!, $playerType: String!, $platform: String!, $skipPlayToken: Boolean!) { ...StreamPlayer_token } fragment StreamPlayer_token on Query { user(login: $login) { login stream @skip(if: $skipPlayToken) { createdAt playbackAccessToken(params: {platform: $platform, playerType: $playerType}) { signature value } id __typename } id __typename } }",
+                query: streamQuery,
                 variables: {
                     "login": m.top.contentRequested.streamerLogin,
                     "platform": "web_tv",
@@ -188,45 +181,8 @@ sub main()
         ' TRANSCODESTACK="transmux" only means "no server transcodes" (plain TS too),
         ' so it is not a verdict. Enhanced Broadcasting is detected from fMP4 below.
         isTransmux = false
-        list = finalPlaylistContent.Split(chr(10))
-
+        stream_objects = parseMasterPlaylist(finalPlaylistContent)
         fps = invalid
-        stream_objects = []
-
-        for line = 0 to list.Count() - 1
-            if list[line].InStr("#EXT-X-STREAM-INF:") = 0
-                rawLine = list[line]
-                stream_info = rawLine.Split(",")
-                streamobject = {}
-                for info = 0 to stream_info.Count() - 1
-                    info_parsed = stream_info[info].Split("=")
-                    if info_parsed.Count() >= 2
-                        key = info_parsed[0].replace("#EXT-X-STREAM-INF:", "")
-                        value = toString(info_parsed[1]).replace(chr(34), "")
-                        streamobject[key] = value
-                    end if
-                end for
-
-                ' CODECS="..." may contain commas (e.g. "avc1.64001f,mp4a.40.2"), which the
-                ' comma-split above truncates. Re-extract it from the raw line verbatim.
-                codecsStart = rawLine.InStr("CODECS=")
-                if codecsStart >= 0
-                    afterEq = rawLine.Mid(codecsStart + 7)
-                    if Left(afterEq, 1) = chr(34)
-                        closeQuote = afterEq.Mid(1).InStr(chr(34))
-                        if closeQuote >= 0
-                            streamobject["CODECS"] = afterEq.Mid(1, closeQuote)
-                        end if
-                    end if
-                end if
-
-                ' Get the URL from the next line
-                if line + 1 < list.Count() and Left(list[line + 1], 1) <> "#"
-                    streamobject["URL"] = list[line + 1]
-                    stream_objects.push(streamobject)
-                end if
-            end if
-        end for
 
         ' If no streams found, this is a critical error
         if stream_objects.Count() = 0
@@ -585,28 +541,6 @@ sub proxyQualityEntry(entry as object, proxyUrl as string, variantHints as objec
     entry.ForwardQueryStringParams = false
 end sub
 
-function buildProxyM3u8Url(proxyUrl as string, streamUrl as string, hints as dynamic) as string
-    url = proxyUrl + "/m3u8?u=" + streamUrl.EncodeUriComponent()
-    if hints = invalid then return url
-
-    codecs = hints.codecs
-    if isValidAndNotEmpty(codecs)
-        url = url + "&codecs=" + codecs.EncodeUriComponent()
-    end if
-
-    bw = hints.bandwidth
-    if isValidAndNotEmpty(bw)
-        url = url + "&bw=" + bw.EncodeUriComponent()
-    end if
-
-    res = hints.resolution
-    if isValidAndNotEmpty(res)
-        url = url + "&res=" + res.EncodeUriComponent()
-    end if
-
-    return url
-end function
-
 function getClipUrlViaGraphQL(clipSlug as string) as dynamic
     ' Try to get clip URL via GraphQL API with proper authentication
     ' ? "[GetTwitchContent] Attempting GraphQL clip lookup for: "; clipSlug
@@ -681,44 +615,6 @@ function getClipUrlViaGraphQL(clipSlug as string) as dynamic
     return invalid
 end function
 
-function generateClipFallbackUrls(clipSlug as string, previewImageUrl as string) as object
-    ' Generate multiple fallback URLs to try
-    fallbackUrls = []
-
-    ' Extract UUID from preview URL if available
-    uuid = invalid
-    if previewImageUrl <> invalid and previewImageUrl <> ""
-        if previewImageUrl.InStr("twitch-clips-thumbnails-prod") > -1
-            pathParts = previewImageUrl.Split("/")
-            if pathParts.Count() >= 6
-                uuid = pathParts[5]
-            end if
-        end if
-    end if
-
-    ' Primary patterns with UUID if available
-    if uuid <> invalid
-        fallbackUrls.push("https://production.assets.clips.twitchcdn.net/v2/media/" + clipSlug + "/" + uuid + "/video.mp4")
-        fallbackUrls.push("https://clips-media-assets2.twitch.tv/" + clipSlug + "-" + uuid + ".mp4")
-        fallbackUrls.push("https://clips-media-assets.twitch.tv/" + clipSlug + "-" + uuid + ".mp4")
-        fallbackUrls.push("https://clips-media-assets2.twitch.tv/" + clipSlug + "/" + uuid + ".mp4")
-    end if
-
-    ' Standard patterns
-    fallbackUrls.push("https://clips-media-assets2.twitch.tv/" + clipSlug + ".mp4")
-    fallbackUrls.push("https://clips-media-assets.twitch.tv/" + clipSlug + ".mp4")
-
-    ' Alternative CDN patterns
-    fallbackUrls.push("https://production.assets.clips.twitchcdn.net/" + clipSlug + ".mp4")
-    fallbackUrls.push("https://clips-media-assets2.twitch.tv/" + clipSlug + "-source.mp4")
-
-    ' Encoded patterns
-    fallbackUrls.push("https://clips-media-assets2.twitch.tv/AT-cm%7C" + clipSlug + ".mp4")
-
-    ' ? "[GetTwitchContent] Generated "; fallbackUrls.Count(); " fallback URLs"
-    return fallbackUrls
-end function
-
 function findWorkingClipUrl(clipSlug as string, previewImageUrl as string) as dynamic
     ' Generate test URLs
     testUrls = generateClipFallbackUrls(clipSlug, previewImageUrl)
@@ -743,7 +639,6 @@ function isUrlAccessible(url as string) as boolean
     req = CreateObject("roUrlTransfer")
     if req = invalid then return false
     req.SetCertificatesFile("common:/certs/ca-bundle.crt")
-    req.InitClientCertificates()
     req.SetUrl(url)
 
     ' Enhanced headers for clip access

@@ -8,7 +8,6 @@
         <field id="channel" type="string" onChange="onEnterChannel" alwaysNotify="true" />
         <field id="channel_id" type="string" />
         <field id="focusable" type="Boolean" value="true" />
-        <field id="control" type="bool" onChange="onVideoChange" value="false" alwaysNotify="true" />
         <field id="doneFocus" type="Boolean" value="false" />
         <field id="clientInfo" type="assocarray" />
         <field id="clientMessage" type="string" value="" />
@@ -20,6 +19,7 @@
         <field id="videoPosition" type="float" value="0.0" onChange="onVideoPositionChange" alwaysNotify="true" />
         <field id="fontSize" type="integer" value="20" onChange="updatePanelTranslation" />
         <function name="stopJobs" />
+        <function name="onDestroy" />
     </interface>
 
     <script type="text/brightscript" uri="Chat.brs" />

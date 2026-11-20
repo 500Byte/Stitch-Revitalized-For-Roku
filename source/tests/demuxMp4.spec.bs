@@ -316,6 +316,64 @@ namespace tests
             m.assertTrue(isMpegTs(ts))
         end sub
 
+        '+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        @describe("bounds checks on malformed MP4")
+        '+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+        private function extractThrows(b as object) as boolean
+            try
+                extractTrackMap(b)
+            catch e
+                return true
+            end try
+            return false
+        end function
+
+        private function splitMediaThrows(b as object, tm as object) as boolean
+            try
+                splitMedia(b, "", tm, "video")
+            catch e
+                return true
+            end try
+            return false
+        end function
+
+        @it("throws on truncated 64-bit box size and short tkhd")
+        sub malformedInitBoxes()
+            b = CreateObject("roByteArray")
+            pushU32(b, 1)
+            pushType(b, "mdat")
+            pushU32(b, 0)
+            m.assertTrue(m.throws(b))
+
+            badTrak = m.box("trak", m.box("tkhd", m.words([0, 0])))
+            badMoov = m.box("moov", badTrak)
+            m.assertTrue(m.extractThrows(badMoov))
+        end sub
+
+        @it("throws on truncated trun dataOffset, huge sampleCount, and out-of-bounds mdat range")
+        sub malformedFragmentBoxes()
+            tm = { "1": "video" }
+
+            ' trun with dataOffset flag (&h1) but missing the 4-byte offset field
+            shortTrun = m.box("trun", m.words([1, 0]))
+            traf1 = m.box("traf", m.cat([m.box("tfhd", m.words([0, 1])), shortTrun]))
+            seg1 = m.cat([m.box("moof", m.cat([m.box("mfhd", m.words([0, 1])), traf1])), m.box("mdat", m.words([]))])
+            m.assertTrue(m.splitMediaThrows(seg1, tm))
+
+            ' trun claiming sampleCount = 100000 with sample_size flag (&h200) and empty body
+            hugeCountTrun = m.box("trun", m.words([&h200, 100000]))
+            traf2 = m.box("traf", m.cat([m.box("tfhd", m.words([0, 1])), hugeCountTrun]))
+            seg2 = m.cat([m.box("moof", m.cat([m.box("mfhd", m.words([0, 1])), traf2])), m.box("mdat", m.words([]))])
+            m.assertTrue(m.splitMediaThrows(seg2, tm))
+
+            ' trun pointing dataOffset past end of file
+            oobTrun = m.box("trun", m.words([&h201, 1, 99999, 16]))
+            traf3 = m.box("traf", m.cat([m.box("tfhd", m.words([0, 1])), oobTrun]))
+            seg3 = m.cat([m.box("moof", m.cat([m.box("mfhd", m.words([0, 1])), traf3])), m.box("mdat", m.words([1]))])
+            m.assertTrue(m.splitMediaThrows(seg3, tm))
+        end sub
+
     end class
 
 end namespace

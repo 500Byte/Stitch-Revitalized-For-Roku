@@ -394,3 +394,42 @@ class TestTruncatedBoxErrors:
         data_offset, total, _ = _parse_trun_data(body, 42)
         assert data_offset == 0
         assert total == 0
+
+    def test_tfhd_truncated_default_sample_size_raises_truncated(self) -> None:
+        from fmp4_demux_proxy.fmp4 import _parse_tfhd_info
+
+        # flag 0x10 = default_sample_size, but body ends at 8 bytes (missing 4-byte size)
+        body = b"\x00\x00\x00\x10" + struct.pack(">I", 1)
+        with pytest.raises(TruncatedBoxError):
+            _parse_tfhd_info(body)
+
+    def test_trun_truncated_data_offset_raises_truncated(self) -> None:
+        from fmp4_demux_proxy.fmp4 import _parse_trun_data
+
+        # flag 0x001 = data_offset, sample_count = 0, but missing 4-byte data_offset
+        body = b"\x00\x00\x00\x01" + struct.pack(">I", 0)
+        with pytest.raises(TruncatedBoxError):
+            _parse_trun_data(body, 0)
+
+    def test_trun_huge_sample_count_raises_truncated_immediately(self) -> None:
+        from fmp4_demux_proxy.fmp4 import _parse_trun_data
+
+        # flag 0x200 = sample_size with sample_count = 0xFFFFFFFF and no sample payload
+        body = b"\x00\x00\x02\x00" + struct.pack(">I", 0xFFFFFFFF)
+        with pytest.raises(TruncatedBoxError):
+            _parse_trun_data(body, 0)
+
+    def test_tkhd_truncated_track_id_raises_truncated(self) -> None:
+        from fmp4_demux_proxy.fmp4 import _build_box, _remap_tkhd_track_id
+
+        tkhd = _build_box(b"tkhd", b"\x00" * 10)  # version=0 needs 16 bytes for track_id
+        with pytest.raises(TruncatedBoxError):
+            _remap_tkhd_track_id(tkhd, 1)
+
+    def test_rewrite_traf_truncated_tfhd_raises_truncated(self) -> None:
+        from fmp4_demux_proxy.fmp4 import _build_box, _rewrite_traf_for_split
+
+        tfhd = _build_box(b"tfhd", b"\x00\x00\x00\x00")  # missing 4-byte track_id
+        traf = _build_box(b"traf", tfhd)
+        with pytest.raises(TruncatedBoxError):
+            _rewrite_traf_for_split(traf, 1, 16)

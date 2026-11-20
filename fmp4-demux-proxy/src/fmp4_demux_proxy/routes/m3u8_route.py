@@ -3,23 +3,41 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Final
 
 import aiohttp
 from aiohttp import web
 
 from fmp4_demux_proxy import manifest as mf
-from fmp4_demux_proxy.upstream import CONFIG_KEY, SESSION_KEY, validate_upstream_url
+from fmp4_demux_proxy.routes.segment_route import MAP_REGISTRY_KEY
+from fmp4_demux_proxy.upstream import (
+    CONFIG_KEY,
+    SESSION_KEY,
+    fetch_upstream,
+    validate_upstream_url,
+)
 
 logger = logging.getLogger(__name__)
 
 _MANIFEST_CONTENT_TYPE: Final[str] = "application/vnd.apple.mpegurl"
+_MAX_MANIFEST_BYTES: Final[int] = 2 * 1024 * 1024
+_VALID_PROTOS: Final[frozenset[str]] = frozenset({"http", "https"})
+_HOST_RE: Final[re.Pattern[str]] = re.compile(
+    r"^([A-Za-z0-9._-]+|\[[0-9A-Fa-f:]+\])(?::[0-9]{1,5})?$"
+)
+BREAK_STORE_KEY: Final[web.AppKey[mf.BreakStore]] = web.AppKey("break_store", mf.BreakStore)
 
 
 def _proxy_base_from_request(request: web.Request) -> str:
-    scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
-    host = request.headers.get("X-Forwarded-Host", request.host)
-    return f"{scheme}://{host}"
+    raw_proto = (
+        request.headers.get("X-Forwarded-Proto", request.scheme).split(",")[0].strip().lower()
+    )
+    scheme = raw_proto if raw_proto in _VALID_PROTOS else request.scheme
+    raw_host = (request.headers.get("X-Forwarded-Host") or request.host).split(",")[0].strip()
+    if not _HOST_RE.match(raw_host):
+        raise web.HTTPBadRequest(text="invalid host header")
+    return f"{scheme}://{raw_host}"
 
 
 def _parse_hints(request: web.Request) -> mf.VariantHints | None:
@@ -50,13 +68,15 @@ async def m3u8_handler(request: web.Request) -> web.Response:
     validate_upstream_url(upstream, cfg.upstream_host_allowlist)
 
     try:
-        async with session.get(upstream, allow_redirects=True) as resp:
-            final_url = str(resp.url)
-            validate_upstream_url(final_url, cfg.upstream_host_allowlist)
-            if resp.status != 200:
-                logger.warning("upstream m3u8 returned %s for %s", resp.status, upstream)
-                raise web.HTTPBadGateway(text=f"upstream status {resp.status}")
-            body_bytes = await resp.read()
+        status, final_url, body_bytes = await fetch_upstream(
+            session,
+            upstream,
+            cfg.upstream_host_allowlist,
+            max_bytes=_MAX_MANIFEST_BYTES,
+        )
+        if status != 200:
+            logger.warning("upstream m3u8 returned %s for %s", status, upstream)
+            raise web.HTTPBadGateway(text=f"upstream status {status}")
     except aiohttp.ClientError as exc:
         logger.error("upstream m3u8 fetch failed for %s: %s", upstream, exc)
         raise web.HTTPBadGateway(text=f"upstream fetch failed: {exc}") from exc
@@ -77,8 +97,27 @@ async def m3u8_handler(request: web.Request) -> web.Response:
         raise web.HTTPBadRequest(text="invalid query param: track")
 
     hints = _parse_hints(request)
+    map_registry = request.app.get(MAP_REGISTRY_KEY)
+    break_store = request.app.get(BREAK_STORE_KEY)
+
+    manifest_text = body_text
+    if (
+        track is not None
+        and break_store is not None
+        and "#EXT-X-ENDLIST" not in body_text
+        and mf.classify(body_text) == mf.ManifestKind.VARIANT
+    ):
+        variant_key = f"{final_url}#{track}"
+        session_key = request.query.get("k") or variant_key
+        manifest_text = mf.keep_break_count(body_text, session_key, break_store, variant_key)
+
     rewritten = mf.rewrite(
-        body_text, base_url=final_url, config=rewrite_cfg, track=track, hints=hints
+        manifest_text,
+        base_url=final_url,
+        config=rewrite_cfg,
+        track=track,
+        hints=hints,
+        map_registry=map_registry,
     )
 
     return web.Response(

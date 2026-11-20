@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from collections import OrderedDict
+from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Final
+from typing import Any, Final
 from urllib.parse import quote, urljoin
 
 _DEFAULT_BANDWIDTH: Final[int] = 4_000_000
@@ -54,6 +55,47 @@ class VariantHints:
 _PREFETCH_TAG: Final[str] = "#EXT-X-TWITCH-PREFETCH:"
 _URI_ATTR_RE: Final[re.Pattern[str]] = re.compile(r'URI\s*=\s*"([^"]*)"')
 _TYPE_ATTR_RE: Final[re.Pattern[str]] = re.compile(r"TYPE\s*=\s*([^,\s]+)")
+_DIGITS_RE: Final[re.Pattern[str]] = re.compile(r"^[0-9]{1,9}$")
+
+class MapRegistry:
+    """Bounded LRU mapping between upstream EXT-X-MAP init URLs and short integer IDs."""
+
+    def __init__(self, max_entries: int = 100) -> None:
+        self._max = max_entries
+        self._next = 0
+        self.by_url: OrderedDict[str, str] = OrderedDict()
+        self.by_id: dict[str, str] = {}
+
+    def register(self, url: str) -> str:
+        existing = self.by_url.get(url)
+        if existing is not None:
+            self.by_url.move_to_end(url)
+            return existing
+        self._next += 1
+        map_id = str(self._next)
+        self.by_url[url] = map_id
+        self.by_id[map_id] = url
+        if len(self.by_url) > self._max:
+            _, evicted_id = self.by_url.popitem(last=False)
+            self.by_id.pop(evicted_id, None)
+        return map_id
+
+    def lookup(self, map_id: str) -> str | None:
+        return self.by_id.get(map_id)
+
+
+@dataclass
+class BreakStore:
+    """Bounded LRU store tracking ad discontinuities across variants of a session."""
+
+    max_lists: int = 8
+    lists: OrderedDict[str, dict[str, Any]] = field(default_factory=OrderedDict)
+
+    def touch(self, key: str) -> None:
+        if key in self.lists:
+            self.lists.move_to_end(key)
+        while len(self.lists) > self.max_lists:
+            self.lists.popitem(last=False)
 
 _MASTER_INDICATORS: Final[tuple[str, ...]] = (
     "#EXT-X-STREAM-INF:",
@@ -103,6 +145,7 @@ def rewrite(
     *,
     track: str | None = None,
     hints: VariantHints | None = None,
+    map_registry: MapRegistry | None = None,
 ) -> str:
     kind = classify(body)
     if kind == ManifestKind.UNKNOWN:
@@ -114,6 +157,7 @@ def rewrite(
     lines = body.splitlines(keepends=True)
     result: list[str] = []
     expect_uri: str | None = None
+    map_param = ""
 
     for line in lines:
         stripped = line.rstrip("\r\n")
@@ -125,7 +169,10 @@ def rewrite(
         if expect_uri is not None and not stripped.startswith("#"):
             ending = line[len(stripped) :]
             abs_url = _resolve(stripped, base_url)
-            result.append(_proxy_url(config, expect_uri, abs_url, track=track) + ending)
+            extra = map_param if expect_uri == "media" else ""
+            result.append(
+                _proxy_url(config, expect_uri, abs_url, track=track, extra=extra) + ending
+            )
             expect_uri = None
             continue
 
@@ -150,15 +197,26 @@ def rewrite(
                 result.append(line)
                 continue
             if stripped.startswith("#EXT-X-MAP:"):
+                if map_registry is not None:
+                    m = _URI_ATTR_RE.search(stripped)
+                    if m is not None and m.group(1):
+                        init_url = _resolve(m.group(1), base_url)
+                        map_param = f"&map={map_registry.register(init_url)}"
                 result.append(_rewrite_uri_attr(line, base_url, config, "init", track=track))
                 continue
             if stripped.startswith("#EXT-X-PART:"):
-                result.append(_rewrite_uri_attr(line, base_url, config, "part", track=track))
-                continue
-            if stripped.startswith("#EXT-X-PRELOAD-HINT:"):
                 result.append(
                     _rewrite_uri_attr(
-                        line, base_url, config, _preload_hint_kind(stripped), track=track
+                        line, base_url, config, "part", track=track, extra=map_param
+                    )
+                )
+                continue
+            if stripped.startswith("#EXT-X-PRELOAD-HINT:"):
+                hint_kind = _preload_hint_kind(stripped)
+                extra = "" if hint_kind == "init" else map_param
+                result.append(
+                    _rewrite_uri_attr(
+                        line, base_url, config, hint_kind, track=track, extra=extra
                     )
                 )
                 continue
@@ -170,13 +228,127 @@ def rewrite(
                 url = stripped[len(_PREFETCH_TAG) :]
                 abs_url = _resolve(url, base_url)
                 result.append(
-                    _PREFETCH_TAG + _proxy_url(config, "prefetch", abs_url, track=track) + ending
+                    _PREFETCH_TAG
+                    + _proxy_url(config, "prefetch", abs_url, track=track, extra=map_param)
+                    + ending
                 )
                 continue
 
         result.append(line)
 
     return "".join(result)
+
+
+def _parse_live_list(lines: list[str]) -> dict[str, Any]:
+    first = 0
+    ok = True
+    has_dsn = False
+    seq_line = -1
+    seg_line = -1
+    uris: list[str] = []
+    breaks: list[int] = []
+    pending = 0
+    for i, raw_line in enumerate(lines):
+        line = raw_line.strip()
+        if line.startswith("#EXT-X-MEDIA-SEQUENCE:"):
+            v = line[22:].strip()
+            if _DIGITS_RE.match(v):
+                first = int(v)
+            else:
+                ok = False
+            seq_line = i
+        elif line.startswith("#EXT-X-DISCONTINUITY-SEQUENCE:"):
+            has_dsn = True
+        elif line == "#EXT-X-DISCONTINUITY":
+            pending += 1
+            if seg_line < 0:
+                seg_line = i
+        elif line != "" and not line.startswith("#"):
+            uris.append(line)
+            breaks.append(pending)
+            pending = 0
+            if seg_line < 0:
+                seg_line = i
+        elif line.startswith("#EXTINF:"):
+            if seg_line < 0:
+                seg_line = i
+    last = first + len(uris) - 1
+    marks = {first + i: b for i, b in enumerate(breaks) if b > 0}
+    return {
+        "ok": ok,
+        "first": first,
+        "last": last,
+        "uris": uris,
+        "marks": marks,
+        "has_dsn": has_dsn,
+        "seq_line": seq_line,
+        "seg_line": seg_line,
+    }
+
+
+def keep_break_count(body: str, key: str, store: BreakStore, variant: str = "") -> str:
+    """Maintain cumulative #EXT-X-DISCONTINUITY-SEQUENCE across sliding live playlists."""
+    if not variant:
+        variant = key
+    lines = body.split("\n")
+    pl = _parse_live_list(lines)
+    if not pl["uris"] or not pl["ok"]:
+        return body
+
+    ss = store.lists.get(key)
+    if pl["has_dsn"] or (ss is not None and ss["native"]):
+        if ss is None or not ss["native"]:
+            store.lists[key] = {"native": True}
+        store.touch(key)
+        return body
+
+    st = ss["variants"].get(variant) if ss is not None else None
+    if st is not None and (pl["first"] < st["first"] or pl["last"] < st["last"]):
+        seen_before = any(u in st["seen"] for u in pl["uris"])
+        if pl["first"] < st["first"] and pl["first"] <= 10 and not seen_before:
+            ss = None
+            st = None
+        else:
+            store.touch(key)
+            return st["out"]
+
+    if ss is None:
+        ss = {"native": False, "base": 0, "ledger": {}, "variants": {}}
+        store.lists[key] = ss
+    store.touch(key)
+    if st is None:
+        if len(ss["variants"]) >= 16:
+            ss["variants"].clear()
+        st = {"first": 0, "last": -1, "disc": 0, "seen": set(), "out": body}
+        ss["variants"][variant] = st
+
+    ss["ledger"].update(pl["marks"])
+    if len(ss["ledger"]) > 256:
+        for k in sorted(ss["ledger"])[:64]:
+            ss["base"] += ss["ledger"].pop(k)
+
+    disc = ss["base"] + sum(v for k, v in ss["ledger"].items() if k < pl["first"])
+    if len(st["seen"]) > 256:
+        st["seen"].clear()
+    st["seen"].update(pl["uris"])
+    st["first"] = pl["first"]
+    st["last"] = pl["last"]
+
+    out = body
+    if disc > 0:
+        at = pl["seg_line"]
+        if pl["seq_line"] >= 0 and pl["seq_line"] < at:
+            at = pl["seq_line"] + 1
+        tag = f"#EXT-X-DISCONTINUITY-SEQUENCE:{disc}"
+        if at <= 0:
+            lines[0] = f"{tag}\n{lines[0]}"
+        else:
+            lines[at - 1] = f"{lines[at - 1]}\n{tag}"
+        out = "\n".join(lines)
+
+    st["disc"] = disc
+    st["out"] = out
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -196,6 +368,7 @@ def _proxy_url(
     upstream: str,
     *,
     track: str | None = None,
+    extra: str = "",
 ) -> str:
     encoded = quote(upstream, safe="")
     if kind == "m3u8":
@@ -206,6 +379,8 @@ def _proxy_url(
     url = f"{config.proxy_base}/s?u={encoded}&k={kind}"
     if track:
         url += f"&track={track}"
+    if extra:
+        url += extra
     return url
 
 
@@ -216,6 +391,7 @@ def _rewrite_uri_attr(
     kind: str,
     *,
     track: str | None = None,
+    extra: str = "",
 ) -> str:
     stripped = line.rstrip("\r\n")
     ending = line[len(stripped) :]
@@ -224,7 +400,7 @@ def _rewrite_uri_attr(
         return line
     old_url = m.group(1)
     abs_url = _resolve(old_url, base_url)
-    proxy_url = _proxy_url(config, kind, abs_url, track=track)
+    proxy_url = _proxy_url(config, kind, abs_url, track=track, extra=extra)
     return stripped[: m.start(1)] + proxy_url + stripped[m.end(1) :] + ending
 
 

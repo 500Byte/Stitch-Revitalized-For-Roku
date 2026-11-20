@@ -169,7 +169,7 @@ Top-level tab switching is handled by `MenuBar` via `onMenuSelection()`. The tab
 
 ### Observer Cleanup
 
-Every `observeField` call must have a corresponding `unobserveField` in `sub onDestroy()`. SceneGraph calls `onDestroy()` automatically when a component is removed from the scene tree. Without cleanup, observers accumulate across scene transitions and timers keep firing after their component is gone.
+Every `observeField` call must have a corresponding `unobserveField` in `sub onDestroy()`. SceneGraph does **not** call `onDestroy()` automatically when a node leaves the tree — components with observers, timers, or child tasks must expose `<function name="onDestroy" />` in their `<interface>`, and parent components must call `node.callFunc("onDestroy")` before removing or replacing them. Without cleanup, observers accumulate across scene transitions and timers keep firing after their component is gone.
 
 Rules:
 - `unobserveField("fieldName")` takes **only the field name** — there is no callback parameter

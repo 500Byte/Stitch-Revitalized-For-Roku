@@ -6,6 +6,7 @@ import asyncio
 import logging
 import re
 from collections import OrderedDict
+from dataclasses import dataclass
 from typing import Final
 from urllib.parse import urlparse
 
@@ -13,7 +14,13 @@ import aiohttp
 from aiohttp import web
 
 from fmp4_demux_proxy import fmp4
-from fmp4_demux_proxy.upstream import CONFIG_KEY, SESSION_KEY, validate_upstream_url
+from fmp4_demux_proxy import manifest as mf
+from fmp4_demux_proxy.upstream import (
+    CONFIG_KEY,
+    SESSION_KEY,
+    fetch_upstream,
+    validate_upstream_url,
+)
 
 _VALID_TRACKS: Final[frozenset[str]] = frozenset({"video", "audio"})
 
@@ -22,17 +29,28 @@ logger = logging.getLogger(__name__)
 _VALID_KINDS: Final[frozenset[str]] = frozenset({"init", "media", "part", "prefetch"})
 _SEGMENT_CONTENT_TYPE: Final[str] = "video/mp4"
 _MAX_CACHE: Final[int] = 50
-# Cap track_maps independently — one entry per unique variant directory path.
+_MAX_SEGMENT_BYTES: Final[int] = 32 * 1024 * 1024
+# Cap track_maps independently — one entry per unique init / variant path.
 # Bounded so long-running / multi-channel proxies don't leak memory.
 _MAX_TRACK_MAPS: Final[int] = 100
+
+
+@dataclass
+class _LockEntry:
+    lock: asyncio.Lock
+    waiters: int = 0
+
 
 TRACK_MAP_KEY: Final[web.AppKey[OrderedDict[str, dict[int, fmp4.TrackKind]]]] = web.AppKey(
     "track_maps", OrderedDict
 )
+MAP_REGISTRY_KEY: Final[web.AppKey[mf.MapRegistry]] = web.AppKey(
+    "map_registry", mf.MapRegistry
+)
 SEGMENT_CACHE_KEY: Final[web.AppKey[OrderedDict[str, bytes]]] = web.AppKey(
     "segment_cache", OrderedDict
 )
-SEGMENT_LOCKS_KEY: Final[web.AppKey[dict[str, asyncio.Lock]]] = web.AppKey("segment_locks", dict)
+SEGMENT_LOCKS_KEY: Final[web.AppKey[dict[str, _LockEntry]]] = web.AppKey("segment_locks", dict)
 
 
 def _cache_key(upstream: str) -> str:
@@ -53,24 +71,28 @@ async def _fetch_dedup(
     locks = app[SEGMENT_LOCKS_KEY]
     cfg = app[CONFIG_KEY]
 
-    if upstream not in locks:
-        locks[upstream] = asyncio.Lock()
-    lock = locks[upstream]
+    entry = locks.get(upstream)
+    if entry is None:
+        entry = _LockEntry(lock=asyncio.Lock())
+        locks[upstream] = entry
 
-    async with lock:
-        if upstream in cache:
-            cache.move_to_end(upstream)
-            return cache[upstream]
+    entry.waiters += 1
+    try:
+        async with entry.lock:
+            if upstream in cache:
+                cache.move_to_end(upstream)
+                return cache[upstream]
 
-        cached = False
-        try:
             try:
-                async with session.get(upstream, allow_redirects=True) as resp:
-                    validate_upstream_url(str(resp.url), cfg.upstream_host_allowlist)
-                    if resp.status != 200:
-                        logger.warning("upstream segment returned %s for %s", resp.status, upstream)
-                        raise web.HTTPBadGateway(text=f"upstream status {resp.status}")
-                    data = await resp.read()
+                status, _, data = await fetch_upstream(
+                    session,
+                    upstream,
+                    cfg.upstream_host_allowlist,
+                    max_bytes=_MAX_SEGMENT_BYTES,
+                )
+                if status != 200:
+                    logger.warning("upstream segment returned %s for %s", status, upstream)
+                    raise web.HTTPBadGateway(text=f"upstream status {status}")
             except aiohttp.ClientError as exc:
                 logger.error("upstream segment fetch failed for %s: %s", upstream, exc)
                 raise web.HTTPBadGateway(text=f"upstream fetch failed: {exc}") from exc
@@ -80,16 +102,27 @@ async def _fetch_dedup(
                 raise web.HTTPBadGateway(text="upstream returned empty segment")
 
             cache[upstream] = data
-            cached = True
             if len(cache) > _MAX_CACHE:
                 evicted, _ = cache.popitem(last=False)
-                locks.pop(evicted, None)
+                evicted_entry = locks.get(evicted)
+                if evicted_entry is not None and evicted_entry.waiters == 0:
+                    locks.pop(evicted, None)
             return data
-        finally:
-            # Drop the lock entry when nothing was cached (fetch failed) so that
-            # a parade of bad URLs cannot grow SEGMENT_LOCKS_KEY without bound.
-            if not cached:
-                locks.pop(upstream, None)
+    finally:
+        entry.waiters -= 1
+        if entry.waiters == 0 and locks.get(upstream) is entry:
+            locks.pop(upstream, None)
+
+
+def _remember_track_map(
+    track_maps: OrderedDict[str, dict[int, fmp4.TrackKind]],
+    key: str,
+    track_map: dict[int, fmp4.TrackKind],
+) -> None:
+    track_maps[key] = track_map
+    track_maps.move_to_end(key)
+    if len(track_maps) > _MAX_TRACK_MAPS:
+        track_maps.popitem(last=False)
 
 
 async def segment_handler(request: web.Request) -> web.Response:
@@ -127,23 +160,39 @@ async def segment_handler(request: web.Request) -> web.Response:
     try:
         if kind == "init":
             track_map = fmp4.extract_track_map(data)
-            track_maps[cache_key] = track_map
-            track_maps.move_to_end(cache_key)
-            if len(track_maps) > _MAX_TRACK_MAPS:
-                track_maps.popitem(last=False)
+            _remember_track_map(track_maps, cache_key, track_map)
+            _remember_track_map(track_maps, upstream, track_map)
             rewritten = fmp4.split_moov(data, track_map, keep)
             logger.debug("init rewritten for %s; track_map=%s", cache_key, track_map)
         else:
-            track_map = track_maps.get(cache_key)
+            map_id = request.query.get("map")
+            map_registry = request.app.get(MAP_REGISTRY_KEY)
+            init_url = (
+                map_registry.lookup(map_id)
+                if (map_id and map_registry is not None)
+                else None
+            )
+            map_lookup_key = init_url if init_url is not None else cache_key
+            track_map = track_maps.get(map_lookup_key)
+            if track_map is None and init_url is not None:
+                validate_upstream_url(init_url, cfg.upstream_host_allowlist)
+                init_data = await _fetch_dedup(session, init_url, request.app)
+                if not (
+                    init_data[:1] == b"\x47"
+                    and (len(init_data) < 189 or init_data[188] == 0x47)
+                ):
+                    track_map = fmp4.extract_track_map(init_data)
+                    _remember_track_map(track_maps, _cache_key(init_url), track_map)
+                    _remember_track_map(track_maps, init_url, track_map)
             if track_map is None:
                 logger.warning(
                     "no track_map cached for %s (k=%s); passing through unchanged",
-                    cache_key,
+                    map_lookup_key,
                     kind,
                 )
                 rewritten = data
             else:
-                track_maps.move_to_end(cache_key)
+                track_maps.move_to_end(map_lookup_key)
                 rewritten = fmp4.split_moof_mdat(data, track_map, keep)
     except fmp4.Fmp4Error as exc:
         logger.warning("fmp4 demux failed for %s (k=%s): %s", upstream, kind, exc)

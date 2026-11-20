@@ -154,21 +154,26 @@ function onKeyEvent(key as string, press as boolean) as boolean
         m.focusedIndex = (m.focusedIndex + 1) mod totalItems
         updateFocus()
         return true
+    else if key = "left" or key = "right"
+        return true
     else if key = "OK"
+        m.top.visible = false
         if m.focusedIndex < m.optionsCount
             m.top.selectedQualityIndex = m.focusedIndex
             m.top.qualitySelected = true
-            m.top.visible = false
         else
             m.top.wasClosed = true
-            m.top.visible = false
         end if
         return true
     else if key = "back"
-        m.top.wasClosed = true
         m.top.visible = false
+        m.top.wasClosed = true
         return true
     end if
 
     return false
 end function
+
+sub onDestroy()
+    m.top.unobserveField("visible")
+end sub

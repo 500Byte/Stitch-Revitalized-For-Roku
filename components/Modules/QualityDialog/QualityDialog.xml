@@ -11,6 +11,7 @@
         <field id="qualitySelected" type="bool" value="false" alwaysNotify="true" />
         <!-- Event fired when dialog was closed/cancelled -->
         <field id="wasClosed" type="bool" value="false" alwaysNotify="true" />
+        <function name="onDestroy" />
     </interface>
 
     <script type="text/brightscript" uri="QualityDialog.brs" />
@@ -55,9 +56,9 @@
                     width="608"
                     horizAlign="center"
                     text="Cancelar"
-                    color="0xFFFFFFFF"
-                    fontSize="18"
-                    fontUri="pkg:/fonts/Archivo-Bold.otf" />
+                    color="0xFFFFFFFF">
+                    <Font role="font" uri="pkg:/fonts/Archivo-Bold.otf" size="18" />
+                </Label>
             </Group>
         </Group>
     </children>

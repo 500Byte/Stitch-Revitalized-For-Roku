@@ -23,11 +23,13 @@
         <field id="qualityOptions" type="array" />
         <field id="selectedQuality" type="string" />
         <field id="chatWidth" type="Integer" value="420" />
+        <function name="onDestroy" />
     </interface>
     <script type="text/brightscript" uri="CustomVideo.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/config.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/misc.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/taskFactory.brs" />
+    <script type="text/brightscript" uri="pkg:/source/utils/playerHud.brs" />
     <children>
         <!-- Modern Time Travel Dialog -->
         <Group id="timeTravelDialog" visible="false" translation="[660,360]">
@@ -194,7 +196,9 @@
             <Group id="bottomOverlayGroup" translation="[70,835]">
                 <!-- Time Displays -->
                 <SimpleLabel id="timeProgress" fontUri="pkg:/fonts/Archivo-Bold.otf" fontSize="18" color="0xFFFFFFFF" translation="[0,-2]" />
-                <Label id="timeDuration" fontUri="pkg:/fonts/Archivo-Bold.otf" fontSize="18" color="0xADADB8FF" translation="[1680,-2]" width="100" horizAlign="right" />
+                <Label id="timeDuration" color="0xADADB8FF" translation="[1680,-2]" width="100" horizAlign="right">
+                    <Font role="font" uri="pkg:/fonts/Archivo-Bold.otf" size="18" />
+                </Label>
                 
                 <!-- Progress Bar -->
                 <Rectangle id="progressBarBase" color="0x3A3A3DFF" width="1780" height="8"  translation="[0,26]" />
@@ -308,12 +312,16 @@
         <!-- Toast notifications (outside controlOverlay so they display even when controls are hidden) -->
         <Group id="chatModeToastGroup" translation="[820, 60]" visible="false">
             <Rectangle id="chatModeToastBg" color="0x000000D0" width="280" height="42" />
-            <Label id="chatModeToast" translation="[0, 8]" width="280" horizAlign="center" text="" color="0xFFFFFFFF" fontSize="20" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+            <Label id="chatModeToast" translation="[0, 8]" width="280" horizAlign="center" text="" color="0xFFFFFFFF">
+                <Font role="font" uri="pkg:/fonts/Archivo-Bold.otf" size="20" />
+            </Label>
         </Group>
 
         <Group id="muteSkipToastGroup" translation="[760, 60]" visible="false">
             <Rectangle id="muteSkipToastBg" color="0xE91E63E6" width="400" height="42" />
-            <Label id="muteSkipToast" translation="[0, 8]" width="400" horizAlign="center" text="" color="0xFFFFFFFF" fontSize="18" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+            <Label id="muteSkipToast" translation="[0, 8]" width="400" horizAlign="center" text="" color="0xFFFFFFFF">
+                <Font role="font" uri="pkg:/fonts/Archivo-Bold.otf" size="18" />
+            </Label>
         </Group>
 
         <!-- Netflix-style Skip Muted Audio Button -->
@@ -322,7 +330,9 @@
             <Rectangle id="skipMuteAccent" color="0xE91E63FF" width="6" height="52" />
             <!-- [OK] badge -->
             <Rectangle color="0xE91E63FF" width="48" height="30" translation="[18, 11]" />
-            <Label translation="[18, 16]" width="48" horizAlign="center" text="OK" color="0xFFFFFFFF" fontSize="15" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+            <Label translation="[18, 16]" width="48" horizAlign="center" text="OK" color="0xFFFFFFFF">
+                <Font role="font" uri="pkg:/fonts/Archivo-Bold.otf" size="15" />
+            </Label>
             <!-- Label -->
             <SimpleLabel translation="[78, 13]" text="Saltar silencio" color="0xFFFFFFFF" fontSize="20" fontUri="pkg:/fonts/Archivo-Bold.otf" />
         </Group>

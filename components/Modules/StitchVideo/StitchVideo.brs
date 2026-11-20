@@ -49,13 +49,11 @@ sub init()
         m.qualityModal.observeField("qualitySelected", "onQualityModalSelected")
         m.qualityModal.observeField("wasClosed", "onQualityModalClosed")
     end if
-    m.qualityDialog = invalid
 
     ' State variables
     m.currentFocusedButton = 0 ' 0=play/pause, 1=chat, 2=quality
     m.isOverlayVisible = false
     m.currentPositionSeconds = 0
-    m.isLiveStream = true ' StitchVideo is always for live streams
 
     ' Timers
     m.fadeAwayTimer = createObject("roSGNode", "Timer")
@@ -127,41 +125,7 @@ sub init()
 end sub
 
 sub createMessageOverlay()
-    if m.messageOverlay = invalid
-        m.messageOverlay = CreateObject("roSGNode", "Group")
-        m.messageOverlay.visible = false
-
-        messageBg = CreateObject("roSGNode", "Rectangle")
-        messageBg.width = 600
-        messageBg.height = 150
-        messageBg.color = "0x000000CC"
-        messageBg.translation = [660, 465]
-
-        messageTitle = CreateObject("roSGNode", "Label")
-        messageTitle.id = "messageTitle"
-        messageTitle.font = "font:MediumBoldSystemFont"
-        messageTitle.text = ""
-        messageTitle.horizAlign = "center"
-        messageTitle.vertAlign = "center"
-        messageTitle.width = 600
-        messageTitle.height = 50
-        messageTitle.translation = [660, 480]
-
-        messageText = CreateObject("roSGNode", "Label")
-        messageText.id = "messageText"
-        messageText.font = "font:SmallSystemFont"
-        messageText.text = ""
-        messageText.horizAlign = "center"
-        messageText.vertAlign = "center"
-        messageText.width = 600
-        messageText.height = 50
-        messageText.translation = [660, 530]
-
-        m.messageOverlay.appendChild(messageBg)
-        m.messageOverlay.appendChild(messageTitle)
-        m.messageOverlay.appendChild(messageText)
-        m.top.appendChild(m.messageOverlay)
-    end if
+    hudCreateMessageOverlay()
 end sub
 
 sub setupLiveUI()
@@ -369,12 +333,7 @@ sub issueLiveEdgeSeek(reason as string)
 end sub
 
 sub onChatVisibilityChange()
-    chatW = 420
-    if m.top.chatWidth <> invalid and m.top.chatWidth > 0
-        chatW = m.top.chatWidth
-    else if m.global.constants <> invalid and m.global.constants.chatWidth <> invalid and m.global.constants.chatWidth > 0
-        chatW = m.global.constants.chatWidth
-    end if
+    chatW = hudGetChatWidth()
 
     ' Adjust layout based on chat visibility (Punto Medio LG + Apple TV)
     if m.top.chatIsVisible
@@ -419,38 +378,15 @@ sub onChatVisibilityChange()
 end sub
 
 sub onStreamLayoutModeChange()
-    mode = m.top.streamLayoutMode
-    text = ""
-    if mode = 1
-        text = "Chat: Lateral"
-    else if mode = 2
-        text = "Chat: Superpuesto"
-    else if mode = 0
-        text = "Chat: Oculto"
-    end if
-
-    if text <> ""
-        showChatToast(text)
-    end if
+    hudOnStreamLayoutModeChange()
 end sub
 
 sub showChatToast(text as string)
-    if m.chatModeToast <> invalid and m.chatModeToastGroup <> invalid
-        m.chatModeToast.text = text
-        m.chatModeToastGroup.visible = true
-        if m.chatToastTimer = invalid
-            m.chatToastTimer = CreateObject("roSGNode", "Timer")
-            m.chatToastTimer.duration = 2
-            m.chatToastTimer.repeat = false
-            m.chatToastTimer.observeField("fire", "hideChatToast")
-        end if
-        m.chatToastTimer.control = "stop"
-        m.chatToastTimer.control = "start"
-    end if
+    hudShowChatToast(text)
 end sub
 
 sub hideChatToast()
-    if m.chatModeToastGroup <> invalid then m.chatModeToastGroup.visible = false
+    hudHideChatToast()
 end sub
 
 sub updateUptime()
@@ -521,30 +457,15 @@ sub onSelectedQualityChange()
 end sub
 
 sub onQualityModalSelected()
-    if m.qualityModal = invalid then return
-    selectedIndex = m.qualityModal.selectedQualityIndex
-    if selectedIndex >= 0 and selectedIndex < m.top.qualityOptions.count()
-        m.top.selectedQuality = m.top.qualityOptions[selectedIndex]
-        m.top.QualityChangeRequest = selectedIndex
-        m.top.QualityChangeRequestFlag = true
-    end if
-    m.top.setFocus(true)
-    if m.fadeAwayTimer <> invalid then m.fadeAwayTimer.control = "start"
+    hudOnQualityModalSelected()
 end sub
 
 sub onQualityModalClosed()
-    m.top.setFocus(true)
-    if m.fadeAwayTimer <> invalid then m.fadeAwayTimer.control = "start"
+    hudOnQualityModalClosed()
 end sub
 
 sub closeQualityDialog()
-    if m.qualityModal <> invalid and m.qualityModal.visible
-        m.qualityModal.visible = false
-        m.top.setFocus(true)
-    end if
-    if m.fadeAwayTimer <> invalid
-        m.fadeAwayTimer.control = "start"
-    end if
+    hudCloseQualityDialog(true)
 end sub
 
 sub updateProgressBar()
@@ -573,7 +494,7 @@ end sub
 
 sub onFadeAway()
     ' Only hide overlay if quality dialog is not visible
-    if m.qualityDialog = invalid
+    if m.qualityModal = invalid or not m.qualityModal.visible
         hideOverlay()
     end if
 end sub
@@ -619,124 +540,39 @@ sub togglePlayPause()
 end sub
 
 sub showQualityDialog()
-    if m.qualityModal = invalid then return
-    if m.top.qualityOptions <> invalid and m.top.qualityOptions.count() > 0
-        m.fadeAwayTimer.control = "stop"
-        m.qualityModal.qualityOptions = m.top.qualityOptions
-        m.qualityModal.currentQuality = m.top.selectedQuality
-        m.qualityModal.visible = true
-        m.qualityModal.setFocus(true)
-    end if
+    hudShowQualityDialog()
 end sub
 
 function convertToReadableTimeFormat(time) as string
-    time = Int(time)
-    if time < 3600
-        minutes = Int(time / 60)
-        seconds = Int(time mod 60)
-        if seconds < 10
-            secondStr = "0" + seconds.toStr()
-        else
-            secondStr = seconds.toStr()
-        end if
-        return minutes.toStr() + ":" + secondStr
-    else
-        hours = Int(time / 3600)
-        minutes = Int((time mod 3600) / 60)
-        seconds = Int(time mod 60)
-
-        if minutes < 10
-            minuteStr = "0" + minutes.toStr()
-        else
-            minuteStr = minutes.toStr()
-        end if
-
-        if seconds < 10
-            secondStr = "0" + seconds.toStr()
-        else
-            secondStr = seconds.toStr()
-        end if
-
-        return hours.toStr() + ":" + minuteStr + ":" + secondStr
-    end if
+    return hudFormatTime(time)
 end function
 
 sub showErrorMessage(title as string, message as string)
-    showMessage(title, message, 0) ' 0 duration means persistent
+    hudShowMessage(title, message, 0) ' 0 duration means persistent
 end sub
 
 sub hideErrorMessage()
-    hideMessage()
+    hudHideMessage()
 end sub
 
 sub showMessage(title as string, message as string, duration as float)
-    createMessageOverlay()
-    if m.messageOverlay <> invalid
-        titleNode = m.messageOverlay.findNode("messageTitle")
-        if titleNode <> invalid
-            titleNode.text = title
-            titleNode.visible = (title <> "")
-        end if
-        messageNode = m.messageOverlay.findNode("messageText")
-        if messageNode <> invalid
-            messageNode.text = message
-            if title = ""
-                messageNode.translation = [660, 515]
-            else
-                messageNode.translation = [660, 530]
-            end if
-        end if
-    end if
-
-    m.messageOverlay.visible = true
-
-    ' Clear any existing auto-hide timer
-    if m.messageTimer <> invalid
-        m.messageTimer.control = "stop"
-        m.messageTimer = invalid
-    end if
-
-    ' Set up auto-hide timer if duration > 0
-    if duration > 0
-        m.messageTimer = CreateObject("roSGNode", "Timer")
-        m.messageTimer.duration = duration
-        m.messageTimer.repeat = false
-        m.messageTimer.observeField("fire", "onMessageTimeout")
-        m.messageTimer.control = "start"
-    end if
+    hudShowMessage(title, message, duration)
 end sub
 
 sub hideMessage()
-    if m.messageOverlay <> invalid
-        m.messageOverlay.visible = false
-    end if
-    if m.messageTimer <> invalid
-        m.messageTimer.control = "stop"
-        m.messageTimer = invalid
-    end if
+    hudHideMessage()
 end sub
 
 sub onMessageTimeout()
-    hideMessage()
-    m.messageTimer = invalid
+    hudOnMessageTimeout()
 end sub
 
 sub showLoadingOverlay()
-    if m.loadingOverlay <> invalid
-        m.loadingOverlay.visible = true
-    end if
-    if m.loadingSpinner <> invalid
-        m.loadingSpinner.control = "start"
-    end if
+    hudShowLoadingOverlay()
 end sub
 
 sub hideLoadingOverlay()
-    if m.loadingOverlay <> invalid
-        m.loadingOverlay.visible = false
-    end if
-    if m.loadingSpinner <> invalid
-        m.loadingSpinner.control = "stop"
-    end if
+    hudHideLoadingOverlay()
 end sub
 
 function onKeyEvent(key, press) as boolean
@@ -800,15 +636,10 @@ function handleMainKeys(key) as boolean
 end function
 
 sub onDestroy()
-    closeQualityDialog()
-    if m.fadeAwayTimer <> invalid
-        m.fadeAwayTimer.control = "stop"
-        m.fadeAwayTimer.unobserveField("fire")
-    end if
-    if m.messageTimer <> invalid
-        m.messageTimer.control = "stop"
-        m.messageTimer.unobserveField("fire")
-    end if
+    hudCloseQualityDialog(false)
+    hudDestroyShared()
+    if m.qualityModal <> invalid then m.qualityModal.callFunc("onDestroy")
+    if m.videoTitle <> invalid then m.videoTitle.callFunc("onDestroy")
     if m.latencyLogTimer <> invalid
         m.latencyLogTimer.control = "stop"
         m.latencyLogTimer.unobserveField("fire")
@@ -816,10 +647,6 @@ sub onDestroy()
     if m.liveEdgeStartupTimer <> invalid
         m.liveEdgeStartupTimer.control = "stop"
         m.liveEdgeStartupTimer.unobserveField("fire")
-    end if
-    if m.chatToastTimer <> invalid
-        m.chatToastTimer.control = "stop"
-        m.chatToastTimer.unobserveField("fire")
     end if
     m.top.unobserveField("position")
     m.top.unobserveField("state")

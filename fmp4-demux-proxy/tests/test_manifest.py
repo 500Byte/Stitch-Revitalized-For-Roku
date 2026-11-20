@@ -8,10 +8,13 @@ from urllib.parse import parse_qs, unquote, urlparse
 import pytest
 
 from fmp4_demux_proxy.manifest import (
+    BreakStore,
     ManifestKind,
+    MapRegistry,
     RewriteConfig,
     VariantHints,
     classify,
+    keep_break_count,
     rewrite,
 )
 
@@ -392,3 +395,104 @@ class TestEdgeCases:
             unquote(upstream.split("u=")[-1].split("&")[0])
             == upstream.split("u=")[-1].split("&")[0]
         )
+
+
+class TestMapRegistryAndParam:
+    def test_map_registry_assigns_ids_and_evicts_lru(self) -> None:
+        reg = MapRegistry(max_entries=2)
+        assert reg.register("https://cdn/init1.mp4") == "1"
+        assert reg.register("https://cdn/init2.mp4") == "2"
+        # Touch init1 so init2 becomes least recently used
+        assert reg.register("https://cdn/init1.mp4") == "1"
+        assert reg.register("https://cdn/init3.mp4") == "3"
+        assert reg.lookup("1") == "https://cdn/init1.mp4"
+        assert reg.lookup("2") is None
+        assert reg.lookup("3") == "https://cdn/init3.mp4"
+
+    def test_variant_rewrite_with_map_registry_tags_media_only(
+        self, config: RewriteConfig
+    ) -> None:
+        reg = MapRegistry()
+        out = rewrite(VARIANT_BASIC, BASE_VARIANT, config, track="video", map_registry=reg)
+        lines = out.splitlines()
+        init_line = next(ln for ln in lines if ln.startswith("#EXT-X-MAP:"))
+        media_line = next(
+            ln for ln in lines if not ln.startswith("#") and "chunk-1454" in ln
+        )
+        prefetch_line = next(ln for ln in lines if ln.startswith("#EXT-X-TWITCH-PREFETCH:"))
+        assert "&map=" not in init_line
+        assert "&map=1" in media_line
+        assert "&map=1" in prefetch_line
+
+
+class TestKeepBreakCount:
+    def test_no_discontinuity_leaves_manifest_unchanged(self) -> None:
+        store = BreakStore()
+        body = (
+            "#EXTM3U\n"
+            "#EXT-X-MEDIA-SEQUENCE:1\n"
+            "#EXTINF:2.0,\nseg1.m4s\n"
+            "#EXTINF:2.0,\nseg2.m4s\n"
+        )
+        assert keep_break_count(body, "sess", store, "v1") == body
+
+    def test_injects_discontinuity_sequence_after_ad_drops(self) -> None:
+        store = BreakStore()
+        first = (
+            "#EXTM3U\n"
+            "#EXT-X-MEDIA-SEQUENCE:10\n"
+            "#EXTINF:2.0,\nseg10.m4s\n"
+            "#EXT-X-DISCONTINUITY\n"
+            "#EXTINF:2.0,\nseg11.m4s\n"
+        )
+        assert "#EXT-X-DISCONTINUITY-SEQUENCE:" not in keep_break_count(first, "sess", store, "v1")
+
+        second = (
+            "#EXTM3U\n"
+            "#EXT-X-MEDIA-SEQUENCE:12\n"
+            "#EXTINF:2.0,\nseg12.m4s\n"
+            "#EXTINF:2.0,\nseg13.m4s\n"
+        )
+        out = keep_break_count(second, "sess", store, "v1")
+        assert "#EXT-X-DISCONTINUITY-SEQUENCE:1" in out
+
+    def test_stale_poll_returns_newest_manifest(self) -> None:
+        store = BreakStore()
+        newer = (
+            "#EXTM3U\n"
+            "#EXT-X-MEDIA-SEQUENCE:20\n"
+            "#EXTINF:2.0,\nseg20.m4s\n"
+        )
+        older = (
+            "#EXTM3U\n"
+            "#EXT-X-MEDIA-SEQUENCE:19\n"
+            "#EXTINF:2.0,\nseg19.m4s\n"
+        )
+        assert keep_break_count(newer, "sess", store, "v1") == newer
+        assert keep_break_count(older, "sess", store, "v1") == newer
+
+    def test_shared_session_ledger_tracks_across_variants(self) -> None:
+        store = BreakStore()
+        v1 = (
+            "#EXTM3U\n"
+            "#EXT-X-MEDIA-SEQUENCE:5\n"
+            "#EXTINF:2.0,\nseg5.m4s\n"
+            "#EXT-X-DISCONTINUITY\n"
+            "#EXTINF:2.0,\nseg6.m4s\n"
+        )
+        keep_break_count(v1, "sess", store, "v1")
+
+        v2 = (
+            "#EXTM3U\n"
+            "#EXT-X-MEDIA-SEQUENCE:7\n"
+            "#EXTINF:2.0,\nseg7.m4s\n"
+        )
+        out = keep_break_count(v2, "sess", store, "v2")
+        assert "#EXT-X-DISCONTINUITY-SEQUENCE:1" in out
+
+    def test_break_store_evicts_oldest_session(self) -> None:
+        store = BreakStore(max_lists=2)
+        for idx in range(3):
+            body = f"#EXTM3U\n#EXT-X-MEDIA-SEQUENCE:1\n#EXTINF:2.0,\ns{idx}.m4s\n"
+            keep_break_count(body, f"k{idx}", store)
+        assert list(store.lists.keys()) == ["k1", "k2"]

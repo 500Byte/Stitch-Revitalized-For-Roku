@@ -36,6 +36,7 @@
              quality change) leave this false so they get the low-latency seek. -->
         <field id="suppressStartupSeek" type="bool" value="false" />
         <field id="chatWidth" type="Integer" value="420" />
+        <function name="onDestroy" />
 
     </interface>
     
@@ -44,6 +45,7 @@
     <script type="text/brightscript" uri="pkg:/source/utils/config.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/misc.brs" />
     <script type="text/brightscript" uri="pkg:/source/utils/analytics.brs" />
+    <script type="text/brightscript" uri="pkg:/source/utils/playerHud.brs" />
     <children>
         <!-- your existing children stay the same -->
         <!-- Modern Floating HUD for Live Streams (Punto Medio LG + Apple TV) -->
@@ -141,7 +143,9 @@
         <!-- Chat Mode Toast notification -->
         <Group id="chatModeToastGroup" translation="[820, 60]" visible="false">
             <Rectangle id="chatModeToastBg" color="0x000000D0" width="280" height="42" />
-            <Label id="chatModeToast" translation="[0, 8]" width="280" horizAlign="center" text="" color="0xFFFFFFFF" fontSize="20" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+            <Label id="chatModeToast" translation="[0, 8]" width="280" horizAlign="center" text="" color="0xFFFFFFFF">
+                <Font role="font" uri="pkg:/fonts/Archivo-Bold.otf" size="20" />
+            </Label>
         </Group>
 
         <!-- Modern Quality Selection Modal (Twitch TV style) -->

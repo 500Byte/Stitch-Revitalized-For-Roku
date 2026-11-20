@@ -26,4 +26,5 @@
     </interface>
     
     <script type="text/brightscript" uri="VideoErrorHandler.brs" />
+    <script type="text/brightscript" uri="pkg:/source/utils/videoRecovery.brs" />
 </component>

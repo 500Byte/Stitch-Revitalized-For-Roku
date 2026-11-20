@@ -1,0 +1,46 @@
+namespace tests
+
+    @suite("OAuth validation helper")
+    class AuthHelperTests extends rooibos.BaseTestSuite
+
+        @describe("classifyOauthValidation")
+
+        @it("treats $default$ and missing token as anonymous without flagging invalid")
+        sub anonymousUser()
+            res = classifyOauthValidation("$default$", invalid, invalid, invalid)
+            m.assertEqual(res.status, "anonymous")
+            m.assertTrue(res.tokenValid)
+
+            res2 = classifyOauthValidation("12345", "", invalid, invalid)
+            m.assertEqual(res2.status, "anonymous")
+            m.assertTrue(res2.tokenValid)
+        end sub
+
+        @it("treats network failures and non-401 payloads as network_error without logout")
+        sub networkFailurePreservesSession()
+            res = classifyOauthValidation("12345", "tok", invalid, invalid)
+            m.assertEqual(res.status, "network_error")
+            m.assertTrue(res.tokenValid)
+
+            res2 = classifyOauthValidation("12345", "tok", "{}", {})
+            m.assertEqual(res2.status, "network_error")
+            m.assertTrue(res2.tokenValid)
+        end sub
+
+        @it("marks token invalid only on explicit HTTP 401")
+        sub explicit401IsInvalid()
+            res = classifyOauthValidation("12345", "tok", "{status:401}", { status: 401 })
+            m.assertEqual(res.status, "invalid")
+            m.assertFalse(res.tokenValid)
+        end sub
+
+        @it("marks token valid when expires_in is present")
+        sub validToken()
+            res = classifyOauthValidation("12345", "tok", "{}", { expires_in: 3600 })
+            m.assertEqual(res.status, "valid")
+            m.assertTrue(res.tokenValid)
+        end sub
+
+    end class
+
+end namespace

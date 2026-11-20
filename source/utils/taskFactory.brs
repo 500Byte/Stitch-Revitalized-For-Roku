@@ -16,19 +16,6 @@ function createApiTask(functionName as string, callback as string, params = inva
     return task
 end function
 
-' Creates a GetTwitchContent task for video/clip playback.
-' contentFields: the content fields associative array (from content.getFields())
-' callback: the callback sub name for the response
-' Returns the task node.
-function createContentTask(contentFields as object, callback as string) as object
-    task = CreateObject("roSGNode", "GetTwitchContent")
-    task.observeField("response", callback)
-    task.contentRequested = contentFields
-    task.functionName = "main"
-    task.control = "run"
-    return task
-end function
-
 ' Creates a Timer node, configures it, and starts it.
 ' duration: timer duration in seconds
 ' callback: the callback sub name for the "fire" event

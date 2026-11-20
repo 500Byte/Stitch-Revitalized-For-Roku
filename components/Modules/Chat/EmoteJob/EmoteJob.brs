@@ -2,10 +2,8 @@ sub init()
     m.top.functionName = "main"
 end sub
 
-sub getGlobalTwitchEmotes()
-    emoteCache = m.global.emoteCache
+sub getGlobalTwitchEmotes(emoteCache as object)
     try
-        ' ? "[EmoteJob] - getGlobalTwitchEmotes"
         access_token = ""
         if get_user_setting("access_token") <> invalid
             access_token = "Bearer " + get_user_setting("access_token")
@@ -29,15 +27,13 @@ sub getGlobalTwitchEmotes()
             end for
         end if
     catch e
-        ? "Error grabbing channelttv badges"
+        ? "[EmoteJob] Error grabbing global Twitch emotes: "; e
     end try
-    m.global.setField("emoteCache", emoteCache)
 end sub
 
-sub getChannelTwitchEmotes(channel_id)
-    emoteCache = m.global.emoteCache
+sub getChannelTwitchEmotes(channel_id, channelEmotes as object)
+    if channel_id = invalid or channel_id = "" then return
     try
-        ' ? "[EmoteJob] - getChannelTwitchEmotes"
         access_token = ""
         if get_user_setting("access_token") <> invalid
             access_token = "Bearer " + get_user_setting("access_token")
@@ -57,22 +53,20 @@ sub getChannelTwitchEmotes(channel_id)
         if response_string?.data <> invalid
             for each emote in response_string.data
                 uri = emote.images.url_1x
-                emoteCache[emote.name] = uri
+                channelEmotes[emote.name] = uri
             end for
         end if
     catch e
-        ? "Error grabbing channelttv badges"
+        ? "[EmoteJob] Error grabbing channel Twitch emotes: "; e
     end try
-    m.global.setField("emoteCache", emoteCache)
 end sub
 
 sub getTwitchBadges()
-    ' ? "[EmoteJob] - getTwitchBadges"
     badgelist = {}
     try
         access_token = ""
         device_code = ""
-        ' doubled up here in stead of defaulting to "" because access_token is dependent on device_code
+        ' doubled up here instead of defaulting to "" because access_token is dependent on device_code
         if get_user_setting("device_code") <> invalid
             device_code = get_user_setting("device_code")
         end if
@@ -101,20 +95,20 @@ sub getTwitchBadges()
             }
         })
         rsp = ParseJSON(req.send())
-        for each badge in rsp.data.badges
-            identifier = badge.setID + "/" + badge.version
-            badgelist[identifier] = badge.image2x
-        end for
-        if rsp.data.user <> invalid
-            if rsp.data.user.broadcastBadges <> invalid
-                for each badge in rsp.data.user.broadcastBadges
-                    identifier = badge.setID + "/" + badge.version
-                    badgelist[identifier] = badge.image2x
-                end for
-            end if
+        if rsp?.data?.badges <> invalid
+            for each badge in rsp.data.badges
+                identifier = badge.setID + "/" + badge.version
+                badgelist[identifier] = badge.image2x
+            end for
+        end if
+        if rsp?.data?.user?.broadcastBadges <> invalid
+            for each badge in rsp.data.user.broadcastBadges
+                identifier = badge.setID + "/" + badge.version
+                badgelist[identifier] = badge.image2x
+            end for
         end if
     catch e
-        ? "Error grabbing twitch badges"
+        ? "[EmoteJob] Error grabbing Twitch badges: "; e
     end try
     if m.global.twitchBadges = invalid
         m.global.addFields({ twitchBadges: badgelist })
@@ -131,15 +125,11 @@ function invokerest(link as string) as object
         },
         method: "GET"
     })
-    response_string = ParseJSON(req.send())
-    ' ? "responseString: "; response_string
-    return response_string
+    return ParseJSON(req.send())
 end function
 
-sub getChannel7tvEmotes(channel_id)
+sub getChannel7tvEmotes(channel_id, channelEmotes as object)
     if channel_id = invalid or channel_id = "" then return
-    emoteCache = m.global.emoteCache
-    if emoteCache = invalid then emoteCache = {}
     try
         temp = invokerest("https://7tv.io/v3/users/twitch/" + channel_id)
         if temp <> invalid and temp.emote_set <> invalid and temp.emote_set.emotes <> invalid
@@ -150,19 +140,16 @@ sub getChannel7tvEmotes(channel_id)
                         ext = "1x.png"
                     end if
                     uri = "https://cdn.7tv.app/emote/" + emote.id + "/" + ext
-                    emoteCache[emote.name] = uri
+                    channelEmotes[emote.name] = uri
                 end if
             end for
         end if
     catch e
         ? "[EmoteJob] Error grabbing 7tv emotes: "; e
     end try
-    m.global.setField("emoteCache", emoteCache)
 end sub
 
-sub getGlobal7tvEmotes()
-    emoteCache = m.global.emoteCache
-    if emoteCache = invalid then emoteCache = {}
+sub getGlobal7tvEmotes(emoteCache as object)
     try
         temp = invokerest("https://7tv.io/v3/emote-sets/global")
         if temp <> invalid and temp.emotes <> invalid
@@ -180,12 +167,9 @@ sub getGlobal7tvEmotes()
     catch e
         ? "[EmoteJob] Error grabbing global 7tv emotes: "; e
     end try
-    m.global.setField("emoteCache", emoteCache)
 end sub
 
-sub getGlobalTTVEmotes()
-    emoteCache = m.global.emoteCache
-    if emoteCache = invalid then emoteCache = {}
+sub getGlobalTTVEmotes(emoteCache as object)
     try
         temp = invokerest("https://api.betterttv.net/3/cached/emotes/global")
         if temp <> invalid
@@ -199,32 +183,26 @@ sub getGlobalTTVEmotes()
     catch e
         ? "[EmoteJob] Error grabbing globalttv emotes: "; e
     end try
-    m.global.setField("emoteCache", emoteCache)
 end sub
 
-sub getChannelTTVFrankerEmotes(channel_id)
+sub getChannelTTVFrankerEmotes(channel_id, channelEmotes as object)
     if channel_id = invalid or channel_id = "" then return
-    emoteCache = m.global.emoteCache
-    if emoteCache = invalid then emoteCache = {}
     try
         temp = invokerest("https://api.betterttv.net/3/cached/frankerfacez/users/twitch/" + channel_id)
         if temp <> invalid
             for each emote in temp
                 if emote.code <> invalid and emote.images <> invalid and emote.images["1x"] <> invalid
-                    emoteCache[emote.code] = emote.images["1x"]
+                    channelEmotes[emote.code] = emote.images["1x"]
                 end if
             end for
         end if
     catch e
         ? "[EmoteJob] Error grabbing channelttvfranker emotes: "; e
     end try
-    m.global.setField("emoteCache", emoteCache)
 end sub
 
-sub getChannelTTVEmotes(channel_id)
+sub getChannelTTVEmotes(channel_id, channelEmotes as object)
     if channel_id = invalid or channel_id = "" then return
-    emoteCache = m.global.emoteCache
-    if emoteCache = invalid then emoteCache = {}
     try
         temp = invokerest("https://api.betterttv.net/3/cached/users/twitch/" + channel_id)
         if temp <> invalid
@@ -232,7 +210,7 @@ sub getChannelTTVEmotes(channel_id)
                 for each emote in temp.channelEmotes
                     if emote.code <> invalid and emote.id <> invalid
                         uri = "https://cdn.betterttv.net/emote/" + emote.id + "/1x"
-                        emoteCache[emote.code] = uri
+                        channelEmotes[emote.code] = uri
                     end if
                 end for
             end if
@@ -240,7 +218,7 @@ sub getChannelTTVEmotes(channel_id)
                 for each emote in temp.sharedEmotes
                     if emote.code <> invalid and emote.id <> invalid
                         uri = "https://cdn.betterttv.net/emote/" + emote.id + "/1x"
-                        emoteCache[emote.code] = uri
+                        channelEmotes[emote.code] = uri
                     end if
                 end for
             end if
@@ -248,34 +226,42 @@ sub getChannelTTVEmotes(channel_id)
     catch e
         ? "[EmoteJob] Error grabbing channelttv emotes: "; e
     end try
-    m.global.setField("emoteCache", emoteCache)
 end sub
 
 sub main()
-    if m.global.emoteCache = invalid
-        m.global.setField("emoteCache", {})
-    end if
     channel_id = m.top.channel_id
-    if channel_id <> invalid and channel_id <> ""
-        getChannelTwitchEmotes(channel_id)
+    channelEmotes = {}
+
+    if m.global.emoteCache = invalid or m.global.emoteCache.Count() = 0
+        globalCache = {}
+        getGlobalTwitchEmotes(globalCache)
+        if get_user_setting("BetterTTVEmote", "true") = "true"
+            getGlobalTTVEmotes(globalCache)
+        end if
+        if get_user_setting("7tvEmote", "true") = "true"
+            getGlobal7tvEmotes(globalCache)
+        end if
+        if m.global.emoteCache = invalid
+            m.global.addFields({ emoteCache: globalCache })
+        else
+            m.global.setField("emoteCache", globalCache)
+        end if
     end if
+    m.top.globalEmotes = m.global.emoteCache
+
     getTwitchBadges()
-    getGlobalTwitchEmotes()
-    if get_user_setting("BetterTTVEmote", "true") = "true"
-        getGlobalTTVEmotes()
-        if channel_id <> invalid and channel_id <> ""
-            getChannelTTVEmotes(channel_id)
+
+    if channel_id <> invalid and channel_id <> ""
+        getChannelTwitchEmotes(channel_id, channelEmotes)
+        if get_user_setting("BetterTTVEmote", "true") = "true"
+            getChannelTTVEmotes(channel_id, channelEmotes)
+        end if
+        if get_user_setting("FFZEmote", "true") = "true"
+            getChannelTTVFrankerEmotes(channel_id, channelEmotes)
+        end if
+        if get_user_setting("7tvEmote", "true") = "true"
+            getChannel7tvEmotes(channel_id, channelEmotes)
         end if
     end if
-    if get_user_setting("FFZEmote", "true") = "true"
-        if channel_id <> invalid and channel_id <> ""
-            getChannelTTVFrankerEmotes(channel_id)
-        end if
-    end if
-    if get_user_setting("7tvEmote", "true") = "true"
-        getGlobal7tvEmotes()
-        if channel_id <> invalid and channel_id <> ""
-            getChannel7tvEmotes(channel_id)
-        end if
-    end if
+    m.top.channelEmotes = channelEmotes
 end sub

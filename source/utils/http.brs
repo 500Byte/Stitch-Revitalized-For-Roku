@@ -3,7 +3,7 @@ function HttpRequest(params = invalid as dynamic) as object
     method = invalid
     headers = {}
     data = invalid
-    timeout = 0
+    timeout = 15000
     retries = 1
     interval = 500
     if params <> invalid
@@ -11,7 +11,7 @@ function HttpRequest(params = invalid as dynamic) as object
         if params.method <> invalid then method = params.method
         if params.headers <> invalid then headers = params.headers
         if params.data <> invalid then data = params.data
-        if params.timeout <> invalid then timeout = params.timeout
+        if params.timeout <> invalid and params.timeout > 0 then timeout = params.timeout
         if params.retries <> invalid then retries = params.retries
         if params.interval <> invalid then interval = params.interval
     end if
@@ -48,7 +48,6 @@ function HttpRequest(params = invalid as dynamic) as object
             'Checks if URL protocol is secured, and adds appropriate parameters if needed
             if m._isProtocolSecure(m._url)
                 request.setCertificatesFile("common:/certs/ca-bundle.crt")
-                request.initClientCertificates()
             end if
 
             return request

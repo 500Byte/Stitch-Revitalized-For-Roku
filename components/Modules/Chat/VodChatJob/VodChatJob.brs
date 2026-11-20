@@ -5,8 +5,8 @@ end sub
 sub fetchNextPage(cursor as dynamic, offset as dynamic)
     if m.top.videoId = invalid or m.top.videoId = "" then return
 
-    query = ReadAsciiFile("pkg:/source/graphql/VideoComments_Query.gql")
-    if query = invalid or query = "" then return
+    if m.commentsQuery = invalid or m.commentsQuery = "" then return
+    query = m.commentsQuery
 
     variables = { "videoID": m.top.videoId }
     if cursor <> invalid and cursor <> ""
@@ -37,8 +37,6 @@ sub fetchNextPage(cursor as dynamic, offset as dynamic)
     commentsData = rsp.data.video.comments
     edges = commentsData.edges
     if edges <> invalid
-        hasNewEmotes = false
-        emoteCache = m.global.emoteCache
         for each edge in edges
             node = edge.node
             if node <> invalid
@@ -52,10 +50,6 @@ sub fetchNextPage(cursor as dynamic, offset as dynamic)
                                 emoteWord = frag.text.trim()
                                 if emoteWord <> ""
                                     emotesList.push({ word: emoteWord, id: frag.emote.emoteID })
-                                    if emoteCache <> invalid and not emoteCache.DoesExist(emoteWord)
-                                        emoteCache[emoteWord] = "https://static-cdn.jtvnw.net/emoticons/v2/" + frag.emote.emoteID + "/static/light/1.0"
-                                        hasNewEmotes = true
-                                    end if
                                 end if
                             end if
                         end if
@@ -102,9 +96,6 @@ sub fetchNextPage(cursor as dynamic, offset as dynamic)
                 end if
             end if
         end for
-        if hasNewEmotes
-            m.global.setField("emoteCache", emoteCache)
-        end if
     end if
 
     if commentsData.pageInfo <> invalid and commentsData.pageInfo.hasNextPage <> invalid
@@ -115,6 +106,7 @@ sub fetchNextPage(cursor as dynamic, offset as dynamic)
 end sub
 
 sub main()
+    m.commentsQuery = ReadAsciiFile("pkg:/source/graphql/VideoComments_Query.gql")
     m.commentsQueue = []
     m.nextCursor = invalid
     m.hasNextPage = true

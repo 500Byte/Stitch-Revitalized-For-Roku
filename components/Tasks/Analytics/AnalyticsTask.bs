@@ -227,7 +227,6 @@ function postToPostHog(payload as object) as boolean
     transfer.SetRequest("POST")
     transfer.AddHeader("Content-Type", "application/json")
     transfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
-    transfer.InitClientCertificates()
     return transfer.PostFromString(FormatJson(payload)) = 200
 end function
 

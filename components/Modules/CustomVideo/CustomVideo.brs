@@ -53,7 +53,6 @@ sub init()
         m.qualityModal.observeField("qualitySelected", "onQualityModalSelected")
         m.qualityModal.observeField("wasClosed", "onQualityModalClosed")
     end if
-    m.qualityDialog = invalid
 
     ' Time travel dialog
     m.timeTravelDialog = m.top.findNode("timeTravelDialog")
@@ -103,7 +102,7 @@ sub init()
     m.isSeekMode = false
     m.buttonHeld = invalid
     m.scrollInterval = 10
-    m.isLiveStream = false
+    m.autoSkipMuted = (get_user_setting("AutoSkipMuted", "false") = "true")
 
     ' Time field references
     m.timeFields = [m.hour0, m.hour1, m.minute0, m.minute1, m.second0, m.second1]
@@ -145,84 +144,29 @@ sub init()
 end sub
 
 sub createMessageOverlay()
-    if m.messageOverlay = invalid
-        m.messageOverlay = CreateObject("roSGNode", "Group")
-        m.messageOverlay.visible = false
-
-        messageBg = CreateObject("roSGNode", "Rectangle")
-        messageBg.width = 600
-        messageBg.height = 150
-        messageBg.color = "0x000000CC"
-        messageBg.translation = [660, 465]
-
-        messageTitle = CreateObject("roSGNode", "Label")
-        messageTitle.id = "messageTitle"
-        messageTitle.font = "font:MediumBoldSystemFont"
-        messageTitle.text = ""
-        messageTitle.horizAlign = "center"
-        messageTitle.vertAlign = "center"
-        messageTitle.width = 600
-        messageTitle.height = 50
-        messageTitle.translation = [660, 480]
-
-        messageText = CreateObject("roSGNode", "Label")
-        messageText.id = "messageText"
-        messageText.font = "font:SmallSystemFont"
-        messageText.text = ""
-        messageText.horizAlign = "center"
-        messageText.vertAlign = "center"
-        messageText.width = 600
-        messageText.height = 50
-        messageText.translation = [660, 530]
-
-        m.messageOverlay.appendChild(messageBg)
-        m.messageOverlay.appendChild(messageTitle)
-        m.messageOverlay.appendChild(messageText)
-        m.top.appendChild(m.messageOverlay)
-    end if
+    hudCreateMessageOverlay()
 end sub
 
 sub onVideoTypeChange()
-    m.isLiveStream = (m.top.video_type = "LIVE")
     updateUIForVideoType()
 
-    ' Update loading text based on video type
     if m.loadingText <> invalid
-        if m.isLiveStream
-            m.loadingText.text = "Loading stream..."
-        else
-            m.loadingText.text = "Loading video..."
-        end if
+        m.loadingText.text = "Loading video..."
     end if
 end sub
 
 sub onVideoIdChange()
-    if m.top.video_type = "VOD" and m.top.video_id <> invalid and m.top.video_id <> "" and m.mutedSegments = invalid
+    if m.top.video_type = "VOD" and m.top.video_id <> invalid and m.top.video_id <> "" and m.mutedSegments = invalid and m.mutedTask = invalid
         m.mutedTask = createApiTask("getVodMutedSegmentsQuery", "onMutedSegmentsResponse", { id: m.top.video_id })
     end if
 end sub
 
 sub updateUIForVideoType()
-    if m.isLiveStream
-        ' Hide seek-related controls for live streams
-        m.rewindGroup.visible = false
-        m.fastForwardGroup.visible = false
-        m.timeTravelGroup.visible = false
-        m.progressDot.visible = false
-
-        ' Adjust button focus indices for live streams
-        ' 0=play/pause, 1=chat, 2=settings
-        if m.currentFocusedButton > 2
-            m.currentFocusedButton = 0 ' Focus play/pause for live
-        end if
-        focusButton(m.currentFocusedButton) ' <-- keep focus visuals in sync
-    else
-        ' Show all controls for VOD/clips
-        m.rewindGroup.visible = true
-        m.fastForwardGroup.visible = true
-        m.timeTravelGroup.visible = true
-        m.progressDot.visible = true
-    end if
+    ' Show all controls for VOD/clips
+    m.rewindGroup.visible = true
+    m.fastForwardGroup.visible = true
+    m.timeTravelGroup.visible = true
+    m.progressDot.visible = true
 end sub
 
 sub onPositionChange()
@@ -230,12 +174,10 @@ sub onPositionChange()
     if not m.isSeekMode
         updateProgressBar()
     end if
-    if m.isLiveStream and m.isOverlayVisible then updateUptime()
 
     ' Auto-skip muted audio segments if enabled, or show Skip Mute button (like Netflix "Skip Intro")
     if m.mutedSegments <> invalid and not m.isSeekMode
         currPos = m.currentPositionSeconds
-        autoSkip = (get_user_setting("AutoSkipMuted", "false") = "true")
         inMutedSegment = false
 
         for each seg in m.mutedSegments
@@ -243,7 +185,7 @@ sub onPositionChange()
                 if currPos >= seg.offset and currPos < (seg.offset + seg.duration - 1)
                     inMutedSegment = true
                     target = seg.offset + seg.duration
-                    if autoSkip
+                    if m.autoSkipMuted
                         m.top.seek = target
                         showMuteToast("Saltando audio silenciado...")
                         hideSkipMuteButton()
@@ -261,37 +203,31 @@ sub onPositionChange()
         end if
     end if
 
-    ' Auto-save bookmark every 20 seconds (not for live streams)
-    if not m.isLiveStream
-        ' Position reads 0 at start and when the player resets on exit; saving it
-        ' would wipe the real bookmark.
-        checker = Int(m.top.position) mod 20
-        if checker = 0 and Int(m.top.position) > 0 and (m._lastBookmarkSecond = invalid or m._lastBookmarkSecond <> Int(m.top.position))
-            m._lastBookmarkSecond = Int(m.top.position)
-            saveVideoBookmark()
-        end if
+    ' Auto-save bookmark every 20 seconds
+    ' Position reads 0 at start and when the player resets on exit; saving it
+    ' would wipe the real bookmark.
+    checker = Int(m.top.position) mod 20
+    if checker = 0 and Int(m.top.position) > 0 and (m._lastBookmarkSecond = invalid or m._lastBookmarkSecond <> Int(m.top.position))
+        m._lastBookmarkSecond = Int(m.top.position)
+        saveVideoBookmark()
     end if
 end sub
 
 sub onVideoStateChange()
     if m.top.state = "playing"
         m.controlButton.uri = "pkg:/images/icons/pause-hero.png"
-        hideLoadingOverlay()
-        hideMessage()
+        hudHideLoadingOverlay()
+        hudHideMessage()
     else if m.top.state = "paused"
         m.controlButton.uri = "pkg:/images/icons/play-hero.png"
-        hideLoadingOverlay()
+        hudHideLoadingOverlay()
     else if m.top.state = "buffering"
-        showLoadingOverlay()
+        hudShowLoadingOverlay()
         if m.loadingText <> invalid
-            if m.isLiveStream
-                m.loadingText.text = "Buffering stream..."
-            else
-                m.loadingText.text = "Buffering video..."
-            end if
+            m.loadingText.text = "Buffering video..."
         end if
     else if m.top.state = "error"
-        hideLoadingOverlay()
+        hudHideLoadingOverlay()
         ? getLogTimestamp(); " [CustomVideo] Video error occurred"
         if m.top.errorStr <> invalid and (m.top.errorStr.InStr("970") > -1 or m.top.errorStr.InStr("buffer:loop:demux") > -1)
             showErrorMessage("Incompatible Video Format", "This video cannot be played on your device")
@@ -300,21 +236,11 @@ sub onVideoStateChange()
         end if
     end if
 
-    ' Show live indicator for live streams
-    if m.isLiveStream
-        m.liveIndicator.visible = true
-    else
-        m.liveIndicator.visible = false
-    end if
+    m.liveIndicator.visible = false
 end sub
 
 sub onChatVisibilityChange()
-    chatW = 420
-    if m.top.chatWidth <> invalid and m.top.chatWidth > 0
-        chatW = m.top.chatWidth
-    else if m.global.constants <> invalid and m.global.constants.chatWidth <> invalid and m.global.constants.chatWidth > 0
-        chatW = m.global.constants.chatWidth
-    end if
+    chatW = hudGetChatWidth()
 
     ' Adjust layout based on chat visibility (Punto Medio LG + Apple TV)
     if m.top.chatIsVisible
@@ -432,38 +358,15 @@ sub renderMutedSegments()
 end sub
 
 sub onStreamLayoutModeChange()
-    mode = m.top.streamLayoutMode
-    text = ""
-    if mode = 1
-        text = "Chat: Lateral"
-    else if mode = 2
-        text = "Chat: Superpuesto"
-    else if mode = 0
-        text = "Chat: Oculto"
-    end if
-
-    if text <> ""
-        showChatToast(text)
-    end if
+    hudOnStreamLayoutModeChange()
 end sub
 
 sub showChatToast(text as string)
-    if m.chatModeToast <> invalid and m.chatModeToastGroup <> invalid
-        m.chatModeToast.text = text
-        m.chatModeToastGroup.visible = true
-        if m.chatToastTimer = invalid
-            m.chatToastTimer = CreateObject("roSGNode", "Timer")
-            m.chatToastTimer.duration = 2
-            m.chatToastTimer.repeat = false
-            m.chatToastTimer.observeField("fire", "hideChatToast")
-        end if
-        m.chatToastTimer.control = "stop"
-        m.chatToastTimer.control = "start"
-    end if
+    hudShowChatToast(text)
 end sub
 
 sub hideChatToast()
-    if m.chatModeToastGroup <> invalid then m.chatModeToastGroup.visible = false
+    hudHideChatToast()
 end sub
 
 sub showMuteToast(text as string)
@@ -489,12 +392,7 @@ sub showSkipMuteButton()
     if m.skipMuteButton = invalid then return
     btnWidth = 360
     margin = 50
-    chatW = 420
-    if m.top.chatWidth <> invalid and m.top.chatWidth > 0
-        chatW = m.top.chatWidth
-    else if m.global.constants <> invalid and m.global.constants.chatWidth <> invalid and m.global.constants.chatWidth > 0
-        chatW = m.global.constants.chatWidth
-    end if
+    chatW = hudGetChatWidth()
 
     if m.top.chatIsVisible
         btnX = (1920 - chatW) - btnWidth - margin
@@ -511,60 +409,6 @@ sub hideSkipMuteButton()
     end if
 end sub
 
-sub updateUptime()
-    if m.uptimeLabel = invalid then return
-
-    createdAtStr = ""
-    if m.top.streamCreatedAt <> invalid and m.top.streamCreatedAt <> ""
-        createdAtStr = m.top.streamCreatedAt
-    else if m.top?.content?.createdAt <> invalid and m.top.content.createdAt <> ""
-        createdAtStr = m.top.content.createdAt
-    end if
-
-    if createdAtStr <> ""
-        startDt = createObject("roDateTime")
-        startDt.FromISO8601String(createdAtStr)
-        nowSec = createObject("roDateTime").AsSeconds()
-        uptimeSec = nowSec - startDt.AsSeconds()
-        if uptimeSec > 0
-            hours = Int(uptimeSec / 3600)
-            minutes = Int((uptimeSec mod 3600) / 60)
-            seconds = uptimeSec mod 60
-
-            hStr = hours.toStr()
-            if hours < 10 then hStr = "0" + hStr
-            mStr = minutes.toStr()
-            if minutes < 10 then mStr = "0" + mStr
-            sStr = seconds.toStr()
-            if seconds < 10 then sStr = "0" + sStr
-
-            ' Dynamic badge width based on text length (e.g. "EN VIVO" vs "LIVE")
-            textLen = 4
-            if m.liveBadgeText <> invalid and m.liveBadgeText.text <> invalid
-                textLen = len(m.liveBadgeText.text)
-            end if
-            badgeWidth = 56
-            if textLen > 4
-                badgeWidth = 84 ' Fits "EN VIVO" cleanly with padding
-            end if
-            if m.liveBadgeBg <> invalid
-                m.liveBadgeBg.width = badgeWidth
-            end if
-
-            uptimeX = badgeWidth + 14
-            m.uptimeLabel.translation = [uptimeX, 6]
-            m.uptimeLabel.text = hStr + ":" + mStr + ":" + sStr
-            m.uptimeLabel.visible = true
-
-            if m.liveCapsuleBg <> invalid
-                m.liveCapsuleBg.width = uptimeX + 85
-            end if
-            return
-        end if
-    end if
-    m.uptimeLabel.visible = false
-end sub
-
 sub onBufferingStatusChange()
     if m.top.bufferingStatus <> invalid
         bufferPercent = m.top.bufferingStatus.percentage
@@ -576,13 +420,7 @@ sub onBufferingStatusChange()
 end sub
 
 sub updateProgressBar()
-    if m.isLiveStream
-        ' For live streams, show minimal progress info
-        m.timeProgress.text = "LIVE"
-        m.timeDuration.text = "LIVE"
-        m.progressBarProgress.width = m.progressBarBase.width ' Full bar for live
-        m.progressDot.visible = false
-    else if m.top.duration > 0 and m.currentPositionSeconds >= 0
+    if m.top.duration > 0 and m.currentPositionSeconds >= 0
         ' Update progress bar for VOD/clips
         progressRatio = m.currentPositionSeconds / m.top.duration
         m.progressBarProgress.width = m.progressBarBase.width * progressRatio
@@ -607,7 +445,6 @@ sub showOverlay()
     m.isOverlayVisible = true
     m.controlOverlay.visible = true
     updateUIForVideoType() ' Ensure UI is correct for video type
-    if m.isLiveStream then updateUptime()
     focusButton(m.currentFocusedButton)
 
     ' Start fade timer
@@ -623,7 +460,7 @@ sub hideOverlay()
 end sub
 
 sub onFadeAway()
-    if not m.isTimeTravelDialogOpen
+    if not m.isTimeTravelDialogOpen and (m.qualityModal = invalid or not m.qualityModal.visible)
         hideOverlay()
     end if
 end sub
@@ -631,35 +468,21 @@ end sub
 sub focusButton(buttonIndex)
     clearAllButtonFocus()
 
-    if m.isLiveStream
-        ' Adjust button indices for live streams (0=play/pause, 1=chat, 2=settings)
-        if buttonIndex = 0 ' Play/Pause
-            m.currentFocusedButton = 0
-            m.playPauseFocus.visible = true
-        else if buttonIndex = 1 ' Chat
-            m.currentFocusedButton = 1
-            m.chatFocus.visible = true
-        else if buttonIndex = 2 ' Settings
-            m.currentFocusedButton = 2
-            if m.settingsFocus <> invalid then m.settingsFocus.visible = true
-        end if
-    else
-        ' Normal button handling for VOD/clips:
-        ' 0=rewind(-10s), 1=play/pause, 2=fastforward(+10s), 3=timetravel, 4=chat, 5=settings
-        m.currentFocusedButton = buttonIndex
-        if buttonIndex = 0 ' Rewind (-10s)
-            m.rewindFocus.visible = true
-        else if buttonIndex = 1 ' Play/Pause
-            m.playPauseFocus.visible = true
-        else if buttonIndex = 2 ' Fast Forward (+10s)
-            m.fastForwardFocus.visible = true
-        else if buttonIndex = 3 ' Time Travel
-            m.timeTravelFocus.visible = true
-        else if buttonIndex = 4 ' Chat
-            m.chatFocus.visible = true
-        else if buttonIndex = 5 ' Settings
-            if m.settingsFocus <> invalid then m.settingsFocus.visible = true
-        end if
+    ' VOD/clips button handling:
+    ' 0=rewind(-10s), 1=play/pause, 2=fastforward(+10s), 3=timetravel, 4=chat, 5=settings
+    m.currentFocusedButton = buttonIndex
+    if buttonIndex = 0 ' Rewind (-10s)
+        m.rewindFocus.visible = true
+    else if buttonIndex = 1 ' Play/Pause
+        m.playPauseFocus.visible = true
+    else if buttonIndex = 2 ' Fast Forward (+10s)
+        m.fastForwardFocus.visible = true
+    else if buttonIndex = 3 ' Time Travel
+        m.timeTravelFocus.visible = true
+    else if buttonIndex = 4 ' Chat
+        m.chatFocus.visible = true
+    else if buttonIndex = 5 ' Settings
+        if m.settingsFocus <> invalid then m.settingsFocus.visible = true
     end if
 end sub
 
@@ -674,35 +497,24 @@ sub clearAllButtonFocus()
 end sub
 
 sub executeButtonAction()
-    if m.isLiveStream
-        ' Live stream button actions (0=play/pause, 1=chat, 2=settings)
-        if m.currentFocusedButton = 0 ' Play/Pause
-            togglePlayPause()
-        else if m.currentFocusedButton = 1 ' Chat
-            m.top.toggleChat = true
-        else if m.currentFocusedButton = 2 ' Settings
-            showQualityDialog()
-        end if
-    else
-        ' VOD/Clips button actions (0=rewind, 1=play/pause, 2=fastforward, 3=timetravel, 4=chat, 5=settings)
-        if m.currentFocusedButton = 0 ' Rewind
-            seekRelative(-10)
-        else if m.currentFocusedButton = 1 ' Play/Pause
-            togglePlayPause()
-        else if m.currentFocusedButton = 2 ' Fast Forward
-            seekRelative(10)
-        else if m.currentFocusedButton = 3 ' Time Travel
-            openTimeTravelDialog()
-        else if m.currentFocusedButton = 4 ' Chat
-            m.top.toggleChat = true
-        else if m.currentFocusedButton = 5 ' Settings
-            showQualityDialog()
-        end if
+    ' VOD/Clips button actions (0=rewind, 1=play/pause, 2=fastforward, 3=timetravel, 4=chat, 5=settings)
+    if m.currentFocusedButton = 0 ' Rewind
+        seekRelative(-10)
+    else if m.currentFocusedButton = 1 ' Play/Pause
+        togglePlayPause()
+    else if m.currentFocusedButton = 2 ' Fast Forward
+        seekRelative(10)
+    else if m.currentFocusedButton = 3 ' Time Travel
+        openTimeTravelDialog()
+    else if m.currentFocusedButton = 4 ' Chat
+        m.top.toggleChat = true
+    else if m.currentFocusedButton = 5 ' Settings
+        showQualityDialog()
     end if
 end sub
 
 sub togglePlayPause()
-    if m.isSeekMode and not m.isLiveStream
+    if m.isSeekMode
         ' Apply seek for VOD/clips
         m.top.seek = m.currentPositionSeconds
         m.isSeekMode = false
@@ -720,10 +532,6 @@ sub togglePlayPause()
 end sub
 
 sub seekRelative(seconds)
-    if m.isLiveStream
-        ? getLogTimestamp(); " [CustomVideo] Seeking disabled for live streams"
-        return
-    end if
 
     if not m.isSeekMode
         m.currentPositionSeconds = m.top.position
@@ -743,10 +551,6 @@ sub seekRelative(seconds)
 end sub
 
 sub showThumbnailPreview()
-    if m.isLiveStream
-        return ' No thumbnails for live streams
-    end if
-
     if m.top.thumbnailInfo <> invalid and m.top.thumbnailInfo.width <> invalid
         m.thumbnailPreview.visible = true
         m.thumbnailTime.text = convertToReadableTimeFormat(m.currentPositionSeconds)
@@ -783,11 +587,6 @@ sub showThumbnailPreview()
 end sub
 
 sub openTimeTravelDialog()
-    if m.isLiveStream
-        ? getLogTimestamp(); " [CustomVideo] Time travel disabled for live streams"
-        return
-    end if
-
     m.isTimeTravelDialogOpen = true
     m.timeTravelDialog.visible = true
     m.timeTravelFocusedField = 0
@@ -902,10 +701,6 @@ sub changeTimeTravelValue(direction)
 end sub
 
 sub onButtonHold()
-    if m.isLiveStream
-        return ' No seeking for live streams
-    end if
-
     if m.buttonHeld = "left"
         seekRelative(-m.scrollInterval)
         m.scrollInterval += 5
@@ -916,54 +711,16 @@ sub onButtonHold()
 end sub
 
 function convertToReadableTimeFormat(time) as string
-    time = Int(time)
-    if time < 3600
-        minutes = Int(time / 60)
-        seconds = Int(time mod 60)
-        if seconds < 10
-            secondStr = "0" + seconds.toStr()
-        else
-            secondStr = seconds.toStr()
-        end if
-        return minutes.toStr() + ":" + secondStr
-    else
-        hours = Int(time / 3600)
-        minutes = Int((time mod 3600) / 60)
-        seconds = Int(time mod 60)
-
-        if minutes < 10
-            minuteStr = "0" + minutes.toStr()
-        else
-            minuteStr = minutes.toStr()
-        end if
-
-        if seconds < 10
-            secondStr = "0" + seconds.toStr()
-        else
-            secondStr = seconds.toStr()
-        end if
-
-        return hours.toStr() + ":" + minuteStr + ":" + secondStr
-    end if
+    return hudFormatTime(time)
 end function
 
 sub saveVideoBookmark()
-    ' Bookmark saving logic (keeping your existing implementation)
-    if m.top.video_type = "LIVE" or m.top.video_type = "VOD"
+    if m.top.video_type = "VOD"
         bookmarkPosition = Int(m.top.position)
-        if m.top.video_type = "LIVE" and m.top?.content?.createdAt <> invalid
-            secondsSincePublished = createObject("roDateTime")
-            secondsSincePublished.FromISO8601String(m.top.content.createdAt.toStr())
-            currentTime = createObject("roDateTime").AsSeconds()
-            bookmarkPosition = currentTime - secondsSincePublished.AsSeconds()
-        end if
-
-        if m.top.video_type = "VOD" then saveLocalBookmark(m.top.video_id, bookmarkPosition)
+        saveLocalBookmark(m.top.video_id, bookmarkPosition)
 
         if get_user_setting("id", invalid) <> invalid
-            if m.bookmarkTask <> invalid
-                m.bookmarkTask = invalid
-            end if
+            m.bookmarkTask = destroyTask(m.bookmarkTask, "response")
             m.bookmarkTask = createObject("roSGNode", "TwitchApiTask")
             m.bookmarkTask.functionname = "updateUserViewedVideo"
             m.bookmarkTask.request = {
@@ -992,79 +749,31 @@ sub saveLocalBookmark(videoId as string, position as integer)
 end sub
 
 sub showErrorMessage(title as string, message as string)
-    showMessage(title, message, 0)
+    hudShowMessage(title, message, 0)
 end sub
 
 sub hideErrorMessage()
-    hideMessage()
+    hudHideMessage()
 end sub
 
 sub showMessage(title as string, message as string, duration as float)
-    createMessageOverlay()
-    if m.messageOverlay <> invalid
-        titleNode = m.messageOverlay.findNode("messageTitle")
-        if titleNode <> invalid
-            titleNode.text = title
-            titleNode.visible = (title <> "")
-        end if
-        messageNode = m.messageOverlay.findNode("messageText")
-        if messageNode <> invalid
-            messageNode.text = message
-            if title = ""
-                messageNode.translation = [660, 515]
-            else
-                messageNode.translation = [660, 530]
-            end if
-        end if
-    end if
-
-    m.messageOverlay.visible = true
-
-    if m.messageTimer <> invalid
-        m.messageTimer.control = "stop"
-        m.messageTimer = invalid
-    end if
-
-    if duration > 0
-        m.messageTimer = CreateObject("roSGNode", "Timer")
-        m.messageTimer.duration = duration
-        m.messageTimer.repeat = false
-        m.messageTimer.observeField("fire", "onMessageTimeout")
-        m.messageTimer.control = "start"
-    end if
+    hudShowMessage(title, message, duration)
 end sub
 
 sub hideMessage()
-    if m.messageOverlay <> invalid
-        m.messageOverlay.visible = false
-    end if
-    if m.messageTimer <> invalid
-        m.messageTimer.control = "stop"
-        m.messageTimer = invalid
-    end if
+    hudHideMessage()
 end sub
 
 sub onMessageTimeout()
-    hideMessage()
-    m.messageTimer = invalid
+    hudOnMessageTimeout()
 end sub
 
 sub showLoadingOverlay()
-    if m.loadingOverlay <> invalid
-        m.loadingOverlay.visible = true
-    end if
-    if m.loadingSpinner <> invalid
-        m.loadingSpinner.control = "start"
-    end if
+    hudShowLoadingOverlay()
 end sub
 
 sub hideLoadingOverlay()
-    if m.loadingOverlay <> invalid
-        m.loadingOverlay.visible = false
-    end if
-    if m.loadingSpinner <> invalid
-        m.loadingSpinner.control = "stop"
-    end if
+    hudHideLoadingOverlay()
 end sub
 
 function onKeyEvent(key, press) as boolean
@@ -1120,37 +829,19 @@ function handleMainKeys(key) as boolean
     end if
 
     if key = "left"
-        if m.isLiveStream
-            ' Live stream navigation: play/pause(0) -> chat(1) -> settings(2)
-            if m.currentFocusedButton > 0
-                focusButton(m.currentFocusedButton - 1)
-            else
-                focusButton(2) ' Wrap to settings
-            end if
+        ' Navigation: rewind(0) -> play/pause(1) -> fastforward(2) -> timetravel(3) -> chat(4) -> settings(5)
+        if m.currentFocusedButton > 0
+            focusButton(m.currentFocusedButton - 1)
         else
-            ' Normal navigation: rewind(0) -> play/pause(1) -> fastforward(2) -> timetravel(3) -> chat(4) -> settings(5)
-            if m.currentFocusedButton > 0
-                focusButton(m.currentFocusedButton - 1)
-            else
-                focusButton(5) ' Wrap to settings button
-            end if
+            focusButton(5) ' Wrap to settings button
         end if
         return true
     else if key = "right"
-        if m.isLiveStream
-            ' Live stream navigation: play/pause(0) -> chat(1) -> settings(2)
-            if m.currentFocusedButton < 2
-                focusButton(m.currentFocusedButton + 1)
-            else
-                focusButton(0) ' Wrap to play/pause
-            end if
+        ' Navigation: rewind(0) .. settings(5)
+        if m.currentFocusedButton < 5
+            focusButton(m.currentFocusedButton + 1)
         else
-            ' Normal navigation: rewind(0) .. settings(5)
-            if m.currentFocusedButton < 5
-                focusButton(m.currentFocusedButton + 1)
-            else
-                focusButton(0) ' Wrap to rewind button
-            end if
+            focusButton(0) ' Wrap to rewind button
         end if
         return true
     else if key = "down" or key = "back"
@@ -1163,18 +854,14 @@ function handleMainKeys(key) as boolean
         togglePlayPause()
         return true
     else if key = "rewind"
-        if not m.isLiveStream
-            m.buttonHeld = "left"
-            m.buttonHoldTimer.control = "start"
-            seekRelative(-10)
-        end if
+        m.buttonHeld = "left"
+        m.buttonHoldTimer.control = "start"
+        seekRelative(-10)
         return true
     else if key = "fastforward"
-        if not m.isLiveStream
-            m.buttonHeld = "right"
-            m.buttonHoldTimer.control = "start"
-            seekRelative(10)
-        end if
+        m.buttonHeld = "right"
+        m.buttonHoldTimer.control = "start"
+        seekRelative(10)
         return true
     end if
 
@@ -1220,21 +907,14 @@ function handleTimeTravelKeys(key) as boolean
 end function
 
 sub onDestroy()
-    if m.fadeAwayTimer <> invalid
-        m.fadeAwayTimer.control = "stop"
-        m.fadeAwayTimer.unobserveField("fire")
-    end if
+    hudCloseQualityDialog(false)
+    hudDestroyShared()
+    if m.qualityModal <> invalid then m.qualityModal.callFunc("onDestroy")
+    if m.videoTitle <> invalid then m.videoTitle.callFunc("onDestroy")
+    m.bookmarkTask = destroyTask(m.bookmarkTask, "response")
     if m.buttonHoldTimer <> invalid
         m.buttonHoldTimer.control = "stop"
         m.buttonHoldTimer.unobserveField("fire")
-    end if
-    if m.messageTimer <> invalid
-        m.messageTimer.control = "stop"
-        m.messageTimer.unobserveField("fire")
-    end if
-    if m.chatToastTimer <> invalid
-        m.chatToastTimer.control = "stop"
-        m.chatToastTimer.unobserveField("fire")
     end if
     if m.muteToastTimer <> invalid
         m.muteToastTimer.control = "stop"
@@ -1249,44 +929,21 @@ sub onDestroy()
     m.top.unobserveField("duration")
     m.top.unobserveField("bufferingStatus")
     m.top.unobserveField("video_type")
-    closeQualityDialog()
     m.top.unobserveField("video_id")
 end sub
 
 sub showQualityDialog()
-    if m.qualityModal = invalid then return
-    if m.top.qualityOptions <> invalid and m.top.qualityOptions.count() > 0
-        m.fadeAwayTimer.control = "stop"
-        m.qualityModal.qualityOptions = m.top.qualityOptions
-        m.qualityModal.currentQuality = m.top.selectedQuality
-        m.qualityModal.visible = true
-        m.qualityModal.setFocus(true)
-    end if
+    hudShowQualityDialog()
 end sub
 
 sub onQualityModalSelected()
-    if m.qualityModal = invalid then return
-    selectedIndex = m.qualityModal.selectedQualityIndex
-    if selectedIndex >= 0 and selectedIndex < m.top.qualityOptions.count()
-        m.top.selectedQuality = m.top.qualityOptions[selectedIndex]
-        m.top.QualityChangeRequest = selectedIndex
-        m.top.QualityChangeRequestFlag = true
-    end if
-    m.top.setFocus(true)
-    if m.fadeAwayTimer <> invalid then m.fadeAwayTimer.control = "start"
+    hudOnQualityModalSelected()
 end sub
 
 sub onQualityModalClosed()
-    m.top.setFocus(true)
-    if m.fadeAwayTimer <> invalid then m.fadeAwayTimer.control = "start"
+    hudOnQualityModalClosed()
 end sub
 
 sub closeQualityDialog()
-    if m.qualityModal <> invalid and m.qualityModal.visible
-        m.qualityModal.visible = false
-        m.top.setFocus(true)
-    end if
-    if m.fadeAwayTimer <> invalid
-        m.fadeAwayTimer.control = "start"
-    end if
+    hudCloseQualityDialog(true)
 end sub

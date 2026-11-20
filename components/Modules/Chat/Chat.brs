@@ -4,6 +4,18 @@ sub init()
     if m.chatPanel <> invalid
         m.chatPanel.color = "0x00000000"
     end if
+    m.globalEmotes = {}
+    if m.global <> invalid and m.global.emoteCache <> invalid
+        m.globalEmotes = m.global.emoteCache
+    end if
+    m.channelEmotes = {}
+    try
+        m.urlRegex = createObject("roRegex", "https?:\/\/[a-zA-Z0-9\.]+", "i")
+        m.quoteRegex = createObject("roRegex", "[\x{2018}\x{2019}]", "")
+    catch e
+        m.urlRegex = invalid
+        m.quoteRegex = invalid
+    end try
     setChatPanelSize()
     setSizingParameters()
     ' determines how far down the screen the first message will appear
@@ -43,14 +55,6 @@ sub setChatPanelSize()
     m.upper_bound = 0 - (m.chatPanel.height - m.font_size)
 end sub
 
-sub onInvisible()
-    if m.top.visible = false
-        m.chat.control = "stop"
-    else
-        m.chat.control = "run"
-    end if
-end sub
-
 ' Stops the ChatJob (IRC) and EmoteJob tasks and releases their observers.
 ' Called from VideoPlayer.exitPlayer() so the IRC socket loop and emote
 ' fetcher are torn down at user-initiated exit, not just when SceneGraph
@@ -58,13 +62,19 @@ end sub
 '
 ' Uses destroyTask() per AGENTS.md: unobserve first so any in-flight
 ' nextCommentObj callback is suppressed before the task thread halts.
-sub stopJobs()
-    stopChatJob()
+sub stopEmoteJob()
     if m.EmoteJob <> invalid
+        m.EmoteJob.unobserveField("globalEmotes")
+        m.EmoteJob.unobserveField("channelEmotes")
         m.EmoteJob.control = "stop"
         m.top.removeChild(m.EmoteJob)
         m.EmoteJob = invalid
     end if
+end sub
+
+sub stopJobs()
+    stopChatJob()
+    stopEmoteJob()
 end sub
 
 ' Asks ChatJob to leave its loop and close its socket. Not destroyTask():
@@ -76,13 +86,6 @@ sub stopChatJob()
         m.chat.unobserveField("broadcasterId")
         m.chat.stopRequested = true
         m.chat = invalid
-    end if
-end sub
-
-sub onVideoChange()
-    if not m.top.control
-        m.chat.control = "stop"
-        m.top.control = true
     end if
 end sub
 
@@ -98,17 +101,28 @@ sub startEmoteJob(channelId as dynamic, channelLogin as dynamic)
     cLogin = ""
     if channelLogin <> invalid then cLogin = channelLogin.toStr()
 
-    if m.EmoteJob <> invalid
-        m.EmoteJob.control = "stop"
-        m.top.removeChild(m.EmoteJob)
-        m.EmoteJob = invalid
-    end if
+    stopEmoteJob()
+    m.channelEmotes = {}
 
     m.EmoteJob = createObject("roSGNode", "EmoteJob")
     m.EmoteJob.channel_id = cId
     m.EmoteJob.channel = cLogin
+    m.EmoteJob.observeField("globalEmotes", "onGlobalEmotesLoaded")
+    m.EmoteJob.observeField("channelEmotes", "onChannelEmotesLoaded")
     m.top.appendChild(m.EmoteJob)
     m.EmoteJob.control = "run"
+end sub
+
+sub onGlobalEmotesLoaded()
+    if m.EmoteJob <> invalid and m.EmoteJob.globalEmotes <> invalid
+        m.globalEmotes = m.EmoteJob.globalEmotes
+    end if
+end sub
+
+sub onChannelEmotesLoaded()
+    if m.EmoteJob <> invalid and m.EmoteJob.channelEmotes <> invalid
+        m.channelEmotes.Append(m.EmoteJob.channelEmotes)
+    end if
 end sub
 
 sub onVodBroadcasterIdChange()
@@ -140,19 +154,6 @@ sub onEnterChannel()
     end if
     startEmoteJob(m.top.channel_id, m.top.channel)
 end sub
-
-function extractMessage(section) as object
-    m.userstate_change = false
-    words = section.Split(" ")
-    if words[2] = "USERSTATE"
-        m.userstate_change = true
-    end if
-    message = ""
-    for i = 4 to words.Count() - 1
-        message += words[i] + " "
-    end for
-    return message
-end function
 
 function buildBadges(badges)
     group = createObject("roSGNode", "Group")
@@ -211,10 +212,14 @@ function buildUsername(display_name, color)
 end function
 
 ' FrankerFaceZ readable username color algorithm for dark backgrounds
-function getReadableUsernameColor(rawColor as string, displayName as string) as string
+function getReadableUsernameColor(rawColor as dynamic, displayName as dynamic) as string
     cleanColor = ""
     if rawColor <> invalid
-        cleanColor = UCase(rawColor.replace("#", "").trim())
+        cleanColor = UCase(rawColor.toStr().replace("#", "").trim())
+    end if
+    nameStr = ""
+    if displayName <> invalid
+        nameStr = displayName.toStr()
     end if
 
     ' 1. If user has no color set, generate consistent pastel color from default Twitch palette
@@ -225,11 +230,9 @@ function getReadableUsernameColor(rawColor as string, displayName as string) as 
             "F1C40F", "1ABC9C", "9B59B6", "00D2D3", "6C5CE7"
         ]
         hashVal = 0
-        if displayName <> invalid
-            for i = 1 to len(displayName)
-                hashVal = (hashVal * 31 + asc(mid(displayName, i, 1))) mod defaultColors.count()
-            end for
-        end if
+        for i = 1 to len(nameStr)
+            hashVal = (hashVal * 31 + asc(mid(nameStr, i, 1))) mod defaultColors.count()
+        end for
         if hashVal < 0 then hashVal = 0 - hashVal
         return defaultColors[hashVal]
     end if
@@ -288,8 +291,10 @@ function buildColon()
 end function
 
 function wordOrImage(word, isUrl = false)
-    if m.global.emoteCache.DoesExist(word)
-        return buildEmote(m.global.emoteCache[word])
+    if m.channelEmotes.DoesExist(word)
+        return buildEmote(m.channelEmotes[word])
+    else if m.globalEmotes.DoesExist(word)
+        return buildEmote(m.globalEmotes[word])
     else
         message_text = createObject("roSGNode", "SimpleLabel")
         message_text.fontSize = m.font_size
@@ -314,8 +319,10 @@ function buildMessage(message, x_translation)
             ? "Found invalid character"
         end if
         ' Make room for emotes just in case
-        urlRegex = createObject("roRegex", "https?:\/\/[a-zA-Z0-9\.]+", "i")
-        isUrl = urlRegex.IsMatch(word)
+        isUrl = false
+        if m.urlRegex <> invalid
+            isUrl = m.urlRegex.IsMatch(word)
+        end if
 
         block = wordOrImage(word, isUrl)
         block_width = block.localBoundingRect().width
@@ -364,8 +371,16 @@ sub onNewCommentObj()
     m.chat.readyForNextComment = false
     if m.chat.nextCommentObj <> invalid
         comment = m.chat.nextCommentObj
-        display_name = comment.tags.display_name
-        message = comment.parameters.trim()
+        display_name = ""
+        if comment?.tags?.display_name <> invalid
+            display_name = comment.tags.display_name.toStr().trim()
+        else if comment?.source?.nick <> invalid
+            display_name = comment.source.nick.toStr().trim()
+        end if
+        message = ""
+        if comment?.parameters <> invalid
+            message = comment.parameters.toStr().trim()
+        end if
         color = ""
         if comment?.tags?.color <> invalid
             color = comment.tags.color.replace("#", "")
@@ -389,32 +404,27 @@ sub onNewCommentObj()
             end for
         end if
 
-        quoteRegex = createObject("roRegex", "[\x{2018}\x{2019}]", "")
-        message = quoteRegex.replace(message, "'")
+        if m.quoteRegex <> invalid
+            message = m.quoteRegex.replace(message, "'")
+        end if
 
-        ' Batch emoteCache additions to avoid costly global field cloning on every emote
-        hasNewEmotes = false
-        emoteCache = m.global.emoteCache
+        ' Keep IRC/VOD inline emotes in component-local m.channelEmotes (zero m.global cloning)
         for each emoticon in emote_set.Items()
-            e_start = emoticon.value.starts[0]
-            emote_word = Mid(message, (e_start + 1), emoticon.value.length)
-            if not emoteCache.DoesExist(emote_word)
-                emoteCache[emote_word] = "https://static-cdn.jtvnw.net/emoticons/v2/" + emoticon.key + "/static/light/1.0"
-                hasNewEmotes = true
+            if emoticon.value.starts.count() > 0 and emoticon.value.length > 0
+                e_start = emoticon.value.starts[0]
+                emote_word = Mid(message, (e_start + 1), emoticon.value.length)
+                if emote_word <> "" and not m.channelEmotes.DoesExist(emote_word) and m.channelEmotes.Count() < 1000
+                    m.channelEmotes[emote_word] = "https://static-cdn.jtvnw.net/emoticons/v2/" + emoticon.key + "/static/light/1.0"
+                end if
             end if
         end for
 
         if comment?.tags?.emotesList <> invalid
             for each em in comment.tags.emotesList
-                if not emoteCache.DoesExist(em.word)
-                    emoteCache[em.word] = "https://static-cdn.jtvnw.net/emoticons/v2/" + em.id + "/static/light/1.0"
-                    hasNewEmotes = true
+                if em?.word <> invalid and em.word <> "" and em?.id <> invalid and not m.channelEmotes.DoesExist(em.word) and m.channelEmotes.Count() < 1000
+                    m.channelEmotes[em.word] = "https://static-cdn.jtvnw.net/emoticons/v2/" + em.id + "/static/light/1.0"
                 end if
             end for
-        end if
-
-        if hasNewEmotes
-            m.global.setField("emoteCache", emoteCache)
         end if
 
         if display_name = "" or message = ""
@@ -470,9 +480,5 @@ sub onNewCommentObj()
 end sub
 
 sub onDestroy()
-    stopChatJob()
-    if m.EmoteJob <> invalid
-        m.EmoteJob.control = "stop"
-        m.EmoteJob = invalid
-    end if
+    stopJobs()
 end sub

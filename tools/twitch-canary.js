@@ -18,15 +18,6 @@ const DEVICE_ID = crypto.randomBytes(16).toString('hex');
 
 const readGql = (file) => fs.readFileSync(path.join(ROOT, 'source/graphql', file), 'utf8');
 
-// The playback path ships inline query strings in GetTwitchContent.brs, not the .gql files.
-// Extract them at run time so the canary tests what the player actually sends.
-function readInlineQuery(operation) {
-    const brs = fs.readFileSync(path.join(ROOT, 'components/Tasks/GetTwitchContent/GetTwitchContent.brs'), 'utf8');
-    const match = brs.match(new RegExp(`query: "(query ${operation}\\b[^"]*)"`));
-    if (!match) throw new Error(`inline ${operation} not found in GetTwitchContent.brs`);
-    return match[1];
-}
-
 const get = (obj, dotted) => dotted.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
 
 function need(obj, dotted, type = 'any') {
@@ -106,20 +97,10 @@ const checks = [
         if (!ctx.game) ctx.game = get(edges, '0.node.name');
         return `${edges.length} categories`;
     }],
-    ['GamesDirectory_Query', async () => {
-        const rsp = await gql(readGql('GamesDirectory_Query.gql'), { first: 80 });
-        return `${need(rsp, 'data.games.edges', 'array').length} games`;
-    }],
     ['GameDirectory_Query_Directory', async () => {
         const game = ctx.game || FALLBACK_GAME;
         const rsp = await gql(readGql('GameDirectory_Query_Directory.gql'), { gameAlias: game, channelsCount: 40 });
         return `${game}: ${need(rsp, 'data.game.streams.edges', 'array').length} streams`;
-    }],
-    ['GameDirectory_Query_Category', async () => {
-        const game = ctx.game || FALLBACK_GAME;
-        const rsp = await gql(readGql('GameDirectory_Query_Category.gql'), { gameAlias: game, channelsCount: 40 });
-        need(rsp, 'data.game');
-        return game;
     }],
     ['Search_Query', async () => {
         const term = ctx.liveLogin || FALLBACK_LOGIN;
@@ -143,30 +124,12 @@ const checks = [
         }
         return `${logins[0]}, vod=${ctx.vodId || 'none'}`;
     }],
-    ['ChannelInterstitial_Query', async () => {
-        const login = ctx.liveLogin || FALLBACK_LOGIN;
-        const rsp = await gql(readGql('ChannelInterstitial_Query.gql'), { login, platform: 'web_tv', playerType: 'pulsar', skipPlayToken: true });
-        need(rsp, 'data.channel');
-        return login;
-    }],
-    ['StreamPlayer_Query', async () => {
-        const login = requireLive();
-        const rsp = await gql(readGql('StreamPlayer_Query.gql'), { login, platform: 'web_tv', playerType: 'pulsar', skipPlayToken: false });
-        need(rsp, 'data.user.stream.playbackAccessToken.value');
-        return login;
-    }],
-    ['VodPlayerWrapper_Query', async () => {
-        if (!ctx.vodId) throw new Skip('no VOD id found on the channel pages');
-        const rsp = await gql(readGql('VodPlayerWrapper_Query.gql'), { videoId: ctx.vodId, platform: 'web_tv', playerType: 'pulsar', skipPlayToken: false });
-        need(rsp, 'data.video.playbackAccessToken.value');
-        return ctx.vodId;
-    }],
     ['FollowingPage_Query', async () => {
         throw new Skip('needs auth (reads the logged-in user\'s follows)');
     }],
-    ['playback: live (GetTwitchContent)', async () => {
+    ['playback: live (StreamPlayer_Query)', async () => {
         const login = requireLive();
-        const rsp = await gql(readInlineQuery('StreamPlayer_Query'), { login, platform: 'web_tv', playerType: 'roku', skipPlayToken: false });
+        const rsp = await gql(readGql('StreamPlayer_Query.gql'), { login, platform: 'web_tv', playerType: 'roku', skipPlayToken: false });
         const token = need(rsp, 'data.user.stream.playbackAccessToken');
         const params = new URLSearchParams({
             allow_source: 'true', fast_bread: 'true', playlist_include_framerate: 'true', player_backend: 'mediaplayer',
@@ -176,9 +139,9 @@ const checks = [
         await usher(`https://usher.ttvnw.net/api/channel/hls/${rsp.data.user.login}.m3u8?${params}`);
         return `${login}: #EXTM3U`;
     }],
-    ['playback: vod (GetTwitchContent)', async () => {
+    ['playback: vod (VodPlayerWrapper_Query)', async () => {
         if (!ctx.vodId) throw new Skip('no VOD id found on the channel pages');
-        const rsp = await gql(readInlineQuery('VodPlayerWrapper_Query'), { videoId: ctx.vodId, platform: 'web_tv', playerType: 'pulsar', skipPlayToken: false });
+        const rsp = await gql(readGql('VodPlayerWrapper_Query.gql'), { videoId: ctx.vodId, platform: 'web_tv', playerType: 'pulsar', skipPlayToken: false });
         const token = need(rsp, 'data.video.playbackAccessToken');
         const params = new URLSearchParams({
             playlist_include_framerate: 'true', allow_source: 'true', player_type: 'pulsar', player_backend: 'mediaplayer',

@@ -51,7 +51,7 @@ Pull requests are welcome. All contributions must be submitted under the [Unlice
 
 ## Privacy
 
-The app collects no personal data. Anonymous, opt-out analytics are available in Settings. Roku and Twitch collect data independently under their own privacy policies.
+The app collects no personal data. Anonymous, opt-out analytics are available in Settings. When signing in via TV code, the temporary activation URL (`twitch.tv/activate?device-code=...`) is sent to `api.qrserver.com` solely to render the login QR code (falling back to a generic QR image if offline). Roku and Twitch collect data independently under their own privacy policies.
 
 ## License & Credits
 
