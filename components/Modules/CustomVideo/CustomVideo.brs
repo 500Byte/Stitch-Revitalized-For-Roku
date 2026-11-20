@@ -67,6 +67,9 @@ sub init()
     m.thumbnailImage = m.top.findNode("thumbnailImage")
     m.thumbnailTime = m.top.findNode("thumbnailTime")
     m.liveIndicator = m.top.findNode("liveIndicator")
+    m.liveBadgeBg = m.top.findNode("liveBadgeBg")
+    m.liveBadgeText = m.top.findNode("liveBadgeText")
+    m.liveCapsuleBg = m.top.findNode("liveCapsuleBg")
     m.uptimeLabel = m.top.findNode("uptimeLabel")
     m.loadingOverlay = m.top.findNode("loadingOverlay")
     m.loadingText = m.top.findNode("loadingText")
@@ -464,8 +467,27 @@ sub updateUptime()
             sStr = seconds.toStr()
             if seconds < 10 then sStr = "0" + sStr
 
-            m.uptimeLabel.text = "Uptime: " + hStr + ":" + mStr + ":" + sStr
+            ' Dynamic badge width based on text length (e.g. "EN VIVO" vs "LIVE")
+            textLen = 4
+            if m.liveBadgeText <> invalid and m.liveBadgeText.text <> invalid
+                textLen = len(m.liveBadgeText.text)
+            end if
+            badgeWidth = 56
+            if textLen > 4
+                badgeWidth = 84 ' Fits "EN VIVO" cleanly with padding
+            end if
+            if m.liveBadgeBg <> invalid
+                m.liveBadgeBg.width = badgeWidth
+            end if
+
+            uptimeX = badgeWidth + 14
+            m.uptimeLabel.translation = [uptimeX, 6]
+            m.uptimeLabel.text = hStr + ":" + mStr + ":" + sStr
             m.uptimeLabel.visible = true
+
+            if m.liveCapsuleBg <> invalid
+                m.liveCapsuleBg.width = uptimeX + 85
+            end if
             return
         end if
     end if

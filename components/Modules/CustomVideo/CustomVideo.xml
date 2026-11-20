@@ -246,11 +246,14 @@
                 </EmojiLabel>
             </Group>
             
-            <!-- Live Indicator & Uptime -->
-            <Group id="liveIndicator" translation="[1640,15]" visible="false">
-                <Rectangle color="0xEB0400FF" width="56" height="24" />
-                <SimpleLabel translation="[10,3]" text="LIVE" color="0xFFFFFFFF" fontSize="16" fontUri="pkg:/fonts/Archivo-Bold.otf" />
-                <SimpleLabel id="uptimeLabel" translation="[66,3]" text="" color="0xADADB8FF" fontSize="16" fontUri="pkg:/fonts/Archivo-Bold.otf" visible="false" />
+            <!-- Live Indicator & Uptime Badge -->
+            <Group id="liveIndicator" translation="[60,40]" visible="false">
+                <Rectangle id="liveCapsuleBg" color="0x18181BE6" width="220" height="32" />
+                <Group id="liveBadgeGroup" translation="[4, 4]">
+                    <Rectangle id="liveBadgeBg" color="0xEB0400FF" width="76" height="24" />
+                    <SimpleLabel id="liveBadgeText" translation="[8, 3]" text="LIVE" color="0xFFFFFFFF" fontSize="14" fontUri="pkg:/fonts/Archivo-Bold.otf" />
+                </Group>
+                <SimpleLabel id="uptimeLabel" translation="[88, 6]" text="" color="0xFFFFFFFF" fontSize="16" fontUri="pkg:/fonts/Archivo-Bold.otf" visible="false" />
             </Group>
             
         </Group>
