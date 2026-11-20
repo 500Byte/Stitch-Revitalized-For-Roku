@@ -373,11 +373,11 @@ sub onChatVisibilityChange()
         m.progressBarBase.width = targetWidth
         m.progressBarProgress.width = targetWidth
 
-        buttonsW = 288
+        buttonsW = 346
         newButtonsX = Int((1920 - chatW - buttonsW) / 2)
         if newButtonsX < 60 then newButtonsX = 60
         if m.actionControlsGroup <> invalid
-            m.actionControlsGroup.translation = [newButtonsX, 955]
+            m.actionControlsGroup.translation = [newButtonsX, 935]
         end if
         if m.videoTitle <> invalid
             m.videoTitle.maxWidth = targetWidth - 200
@@ -389,13 +389,13 @@ sub onChatVisibilityChange()
         m.progressBarBase.width = 1800
         m.progressBarProgress.width = 1800
         if m.actionControlsGroup <> invalid
-            m.actionControlsGroup.translation = [816, 955]
+            m.actionControlsGroup.translation = [787, 935]
         end if
         if m.videoTitle <> invalid
             m.videoTitle.maxWidth = 1100
         end if
         if m.liveIndicator <> invalid
-            m.liveIndicator.translation = [1500, 6]
+            m.liveIndicator.translation = [1460, 10]
         end if
     end if
     updateProgressBar()

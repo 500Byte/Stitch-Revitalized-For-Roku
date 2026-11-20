@@ -313,11 +313,11 @@ sub onChatVisibilityChange()
         m.progressBarBase.width = targetWidth
 
         ' Recenter action buttons in visible video area: (1920 - chatW - buttonsWidth) / 2
-        buttonsW = 492
+        buttonsW = 596
         newButtonsX = Int((1920 - chatW - buttonsW) / 2)
         if newButtonsX < 60 then newButtonsX = 60
         if m.actionControlsGroup <> invalid
-            m.actionControlsGroup.translation = [newButtonsX, 955]
+            m.actionControlsGroup.translation = [newButtonsX, 935]
         end if
 
         ' Adjust right timestamp label coordinate
@@ -336,7 +336,7 @@ sub onChatVisibilityChange()
     else
         m.progressBarBase.width = 1800
         if m.actionControlsGroup <> invalid
-            m.actionControlsGroup.translation = [714, 955]
+            m.actionControlsGroup.translation = [662, 935]
         end if
         if m.timeDuration <> invalid
             m.timeDuration.translation = [1720, 0]
@@ -345,7 +345,7 @@ sub onChatVisibilityChange()
             m.videoTitle.maxWidth = 1100
         end if
         if m.liveIndicator <> invalid
-            m.liveIndicator.translation = [1500, 6]
+            m.liveIndicator.translation = [1460, 10]
         end if
     end if
 
@@ -407,7 +407,7 @@ sub renderMutedSegments()
 
             rect = createObject("roSGNode", "Rectangle")
             rect.width = segW
-            rect.height = 6
+            rect.height = 8
             rect.color = "0xFF3860D0" ' Semi-transparent magenta/coral: renders dark coral on gray track, bright pink on purple progress
             rect.translation = [startX, 0]
             m.mutedSegmentsGroup.appendChild(rect)
@@ -565,11 +565,11 @@ sub updateProgressBar()
         m.progressBarProgress.width = m.progressBarBase.width * progressRatio
 
         ' Clamp the progress dot position within bounds
-        dotX = m.progressBarBase.width * progressRatio - 9
+        dotX = m.progressBarBase.width * progressRatio - 11
         if dotX < 0 then dotX = 0
         if dotX > m.progressBarBase.width then dotX = m.progressBarBase.width
 
-        m.progressDot.translation = [dotX, 18]
+        m.progressDot.translation = [dotX, 21]
         m.progressDot.visible = true
 
         ' Update time displays: elapsed on left, remaining (-HH:MM:SS) on right
