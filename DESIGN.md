@@ -85,3 +85,51 @@ Para nombres de usuario en el chat:
 3. Si $Y < 115$ (color demasiado oscuro para fondo negro), se aclara proporcionalmente preservando el tono cromático original:
    $$\text{ratio} = \frac{115 - Y}{160}$$
    $$C' = C + (255 - C) \times \text{ratio}$$
+
+---
+
+## 6. Arquitectura del Reproductor (Modern Floating HUD)
+
+El reproductor adopta una arquitectura de HUD flotante de dos zonas superpuestas sobre el vídeo mediante degradados verticales cinematográficos (*scrims*):
+
+### A. Zona Superior (Top Floating Header)
+- **Coordenadas:** `translation: [60, 48]`, altura `100px`.
+- **Top Scrim:** Gradiente `1920 × 200px` de `0x000000D0` a `0x00000000`.
+- **Avatar:** `CirclePoster` `48 × 48px` con contorno `0x26262CFF`.
+- **Streamer Name:** `Archivo-Bold.otf` 22px (`textPrimary`).
+- **Stream/VOD Title:** `Archivo-Regular.otf` 16px (`textSecondary`), `maxWidth: 1100px`.
+- **Badges de Estado:**
+  - `[ EN VIVO ]  01:26:31`: Cápsula `0x18181BE6` de 32px de altura con texto en `accentLive` y `textPrimary`.
+  - `[ 1080p60 ]`: Pastilla `0x1F1F23CC` de 24px de altura con la calidad activa.
+
+### B. Zona Inferior (Bottom Floating Controls & Scrubber)
+- **Coordenadas:** `translation: [60, 880]`, altura `150px`.
+- **Bottom Scrim:** Gradiente `1920 × 240px` de `0x00000000` a `0x000000E6`.
+- **Seekbar:**
+  - Base: `1800 × 6px`, color `0x3A3A3DFF`.
+  - Buffer: `0x53535FFF`.
+  - Progreso: `0x9146FFFF`.
+  - Tramos silenciados (VOD): Capa superior con `0xFF3860D0` (dual-blend: coral en tramo no visto, rosa neón en tramo reproducido).
+  - Scrubber Dot: `18 × 18px` circular con halo `focusRing`.
+- **Timestamps:**
+  - Izquierda: `timeProgress` (`01:23:45`) en `Archivo-Bold` 16px.
+  - Derecha: Tiempo restante (`-00:45:12`) o duración en `Archivo-Regular` 16px.
+- **Fila de Acciones en Cápsulas (Pills):**
+  - Botones rediseñados como cápsulas estilizadas con esquinas redondeadas:
+    - `[ ← ]`: Volver (`52 × 44px`).
+    - `[ ⏱ ]`: Time Travel (`52 × 44px`).
+    - `[ -10 ]`: Retroceso rápido (`64 × 44px`).
+    - `[ ▶ / ⏸ ]`: Botón Hero central (`72 × 48px`).
+    - `[ +10 ]`: Avance rápido (`64 × 44px`).
+    - `[ 💬 ]`: Modo de Chat (`64 × 44px`).
+    - `[ ⚙ ]`: Menú de Ajustes / Calidad rápida (`52 × 44px`).
+- **Micro-interacciones de Foco:**
+  - Botón activo: fondo `focusRing` (`0x9146FFFF`) con icono blanco y escalado sutil.
+  - Botón inactivo: fondo `0x404040AA` con icono teñido a `0xADADB8FF` vía `blendColor`.
+
+### C. Responsividad con Chat Sidebar
+- Al abrirse el chat lateral (`400px` – `576px`):
+  - El ancho de la seekbar se contrae automáticamente a `1800 - chatWidth`.
+  - Los botones inferiores se recentran dentro del área visible: `x = (1800 - chatWidth) / 2`.
+  - El título superior ajusta su `maxWidth` a `1100 - chatWidth` evitando cualquier colisión.
+
