@@ -69,6 +69,7 @@ end sub
 sub stopChatJob()
     if m.chat <> invalid
         m.chat.unobserveField("nextCommentObj")
+        m.chat.unobserveField("broadcasterId")
         m.chat.stopRequested = true
         m.chat = invalid
     end if
@@ -87,12 +88,28 @@ sub onVideoPositionChange()
     end if
 end sub
 
+sub onVodBroadcasterIdChange()
+    if m.chat <> invalid and m.chat.broadcasterId <> invalid and m.chat.broadcasterId <> ""
+        m.top.channel_id = m.chat.broadcasterId
+        if m.chat.broadcasterLogin <> invalid and m.chat.broadcasterLogin <> ""
+            m.top.channel = m.chat.broadcasterLogin
+        end if
+        if m.EmoteJob <> invalid
+            m.EmoteJob.channel_id = m.chat.broadcasterId
+            m.EmoteJob.channel = m.chat.broadcasterLogin
+            m.EmoteJob.control = "stop"
+            m.EmoteJob.control = "run"
+        end if
+    end if
+end sub
+
 sub onEnterChannel()
     if m.top.isVod = true
         m.chat = m.top.findnode("VodChatJob")
         m.chat.videoId = m.top.videoId
         m.chat.currentPosition = m.top.videoPosition
         m.chat.observeField("nextCommentObj", "onNewCommentObj")
+        m.chat.observeField("broadcasterId", "onVodBroadcasterIdChange")
         m.chat.control = "stop"
         m.chat.control = "run"
     else
@@ -305,6 +322,16 @@ sub onNewCommentObj()
                 m.global.setField("emoteCache", emoteCache)
             end if
         end for
+
+        if comment?.tags?.emotesList <> invalid
+            for each em in comment.tags.emotesList
+                if not m.global.emoteCache.DoesExist(em.word)
+                    emoteCache = m.global.emoteCache
+                    emoteCache[em.word] = "https://static-cdn.jtvnw.net/emoticons/v2/" + em.id + "/static/light/1.0"
+                    m.global.setField("emoteCache", emoteCache)
+                end if
+            end for
+        end if
 
         if display_name = "" or message = ""
             m.chat.readyForNextComment = true

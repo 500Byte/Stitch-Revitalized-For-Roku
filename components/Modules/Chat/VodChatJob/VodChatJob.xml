@@ -2,6 +2,8 @@
 <component name="VodChatJob" extends="Task">
     <interface>
         <field id="videoId" type="string" />
+        <field id="broadcasterId" type="string" alwaysNotify="true" />
+        <field id="broadcasterLogin" type="string" alwaysNotify="true" />
         <field id="currentPosition" type="float" value="0.0" alwaysNotify="true" />
         <field id="readyForNextComment" type="bool" value="true" />
         <field id="nextCommentObj" type="AssocArray" alwaysNotify="true" />

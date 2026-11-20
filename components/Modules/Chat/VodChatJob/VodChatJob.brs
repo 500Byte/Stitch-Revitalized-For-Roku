@@ -26,6 +26,14 @@ sub fetchNextPage(cursor as dynamic, offset as dynamic)
         return
     end if
 
+    if rsp.data.video.owner <> invalid
+        owner = rsp.data.video.owner
+        if m.top.broadcasterId = invalid or m.top.broadcasterId = ""
+            if owner.id <> invalid then m.top.broadcasterId = owner.id
+            if owner.login <> invalid then m.top.broadcasterLogin = owner.login
+        end if
+    end if
+
     commentsData = rsp.data.video.comments
     edges = commentsData.edges
     if edges <> invalid
@@ -33,9 +41,32 @@ sub fetchNextPage(cursor as dynamic, offset as dynamic)
             node = edge.node
             if node <> invalid
                 text = ""
+                emotesList = []
                 if node.message <> invalid and node.message.fragments <> invalid
                     for each frag in node.message.fragments
-                        if frag.text <> invalid then text += frag.text
+                        if frag.text <> invalid
+                            text += frag.text
+                            if frag.emote <> invalid and frag.emote.emoteID <> invalid
+                                emoteWord = frag.text.trim()
+                                if emoteWord <> ""
+                                    emotesList.push({ word: emoteWord, id: frag.emote.emoteID })
+                                    if m.global.emoteCache <> invalid and not m.global.emoteCache.DoesExist(emoteWord)
+                                        emoteCache = m.global.emoteCache
+                                        emoteCache[emoteWord] = "https://static-cdn.jtvnw.net/emoticons/v2/" + frag.emote.emoteID + "/static/light/1.0"
+                                        m.global.setField("emoteCache", emoteCache)
+                                    end if
+                                end if
+                            end if
+                        end if
+                    end for
+                end if
+
+                badges = []
+                if node.message <> invalid and node.message.userBadges <> invalid
+                    for each ub in node.message.userBadges
+                        if ub.setID <> invalid and ub.version <> invalid
+                            badges.push(ub.setID + "/" + ub.version)
+                        end if
                     end for
                 end if
 
@@ -53,8 +84,9 @@ sub fetchNextPage(cursor as dynamic, offset as dynamic)
                     tags: {
                         display_name: displayName,
                         color: color,
-                        badges: [],
-                        emotes: {}
+                        badges: badges,
+                        emotes: {},
+                        emotesList: emotesList
                     },
                     parameters: text
                 }
