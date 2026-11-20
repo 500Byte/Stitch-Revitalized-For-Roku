@@ -81,13 +81,28 @@ sub onVideoChange()
     end if
 end sub
 
+sub onVideoPositionChange()
+    if m.top.isVod = true and m.chat <> invalid
+        m.chat.currentPosition = m.top.videoPosition
+    end if
+end sub
+
 sub onEnterChannel()
-    m.chat = m.top.findnode("ChatJob")
-    m.chat.forceLive = m.top.forceLive
-    m.chat.observeField("nextCommentObj", "onNewCommentObj")
-    m.chat.channel = m.top.channel
-    m.chat.control = "stop"
-    m.chat.control = "run"
+    if m.top.isVod = true
+        m.chat = m.top.findnode("VodChatJob")
+        m.chat.videoId = m.top.videoId
+        m.chat.currentPosition = m.top.videoPosition
+        m.chat.observeField("nextCommentObj", "onNewCommentObj")
+        m.chat.control = "stop"
+        m.chat.control = "run"
+    else
+        m.chat = m.top.findnode("ChatJob")
+        m.chat.forceLive = m.top.forceLive
+        m.chat.observeField("nextCommentObj", "onNewCommentObj")
+        m.chat.channel = m.top.channel
+        m.chat.control = "stop"
+        m.chat.control = "run"
+    end if
     m.EmoteJob = m.top.findnode("EmoteJob")
     m.EmoteJob.channel_id = m.top.channel_id
     m.EmoteJob.channel = m.top.channel

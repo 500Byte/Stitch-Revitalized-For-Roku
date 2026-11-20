@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="VodChatJob" extends="Task">
+    <interface>
+        <field id="videoId" type="string" />
+        <field id="currentPosition" type="float" value="0.0" alwaysNotify="true" />
+        <field id="readyForNextComment" type="bool" value="true" />
+        <field id="nextCommentObj" type="AssocArray" alwaysNotify="true" />
+        <field id="stopRequested" type="bool" value="false" />
+    </interface>
+    <script type="text/brightscript" uri="VodChatJob.brs" />
+    <script type="text/brightscript" uri="pkg:/source/enums/TaskControl.bs" />
+    <script type="text/brightscript" uri="pkg:/components/Tasks/twitch-api-sdk/shared.bs" />
+    <script type="text/brightscript" uri="pkg:/source/utils/http.brs" />
+    <script type="text/brightscript" uri="pkg:/source/utils/config.brs" />
+    <script type="text/brightscript" uri="pkg:/source/utils/misc.brs" />
+    <script type="text/brightscript" uri="pkg:/source/utils/analytics.brs" />
+    <script type="text/brightscript" uri="pkg:/source/bslib.brs" />
+</component>

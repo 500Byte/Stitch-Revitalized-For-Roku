@@ -14,6 +14,9 @@
         <field id="width" type="integer" value="275" alias="chatPanel.width, chatBackground.width" onchange="updatePanelTranslation" />
         <field id="height" type="integer" value="1080" alias="chatPanel.height, chatBackground.height" onChange="updatePanelTranslation" />
         <field id="forceLive" type="bool" value="false" />
+        <field id="isVod" type="bool" value="false" />
+        <field id="videoId" type="string" value="" />
+        <field id="videoPosition" type="float" value="0.0" onChange="onVideoPositionChange" alwaysNotify="true" />
         <field id="translation" type="vector2d" alias="chatPanel.translation" />
         <field id="fontSize" type="integer" value="14" onChange="updatePanelTranslation" />
         <function name="stopJobs" />
@@ -48,6 +51,10 @@
             fontUri="pkg:/fonts/Archivo-Regular.otf" /> -->
         <ChatJob
             id="ChatJob"
+            control="stop"
+        />
+        <VodChatJob
+            id="VodChatJob"
             control="stop"
         />
         <EmoteJob

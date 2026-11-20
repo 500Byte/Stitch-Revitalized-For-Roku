@@ -1,0 +1,26 @@
+query VideoComments_Query($videoID: ID!, $contentOffsetSeconds: Int, $cursor: Cursor) {
+  video(id: $videoID) {
+    comments(contentOffsetSeconds: $contentOffsetSeconds, after: $cursor) {
+      edges {
+        cursor
+        node {
+          id
+          contentOffsetSeconds
+          commenter {
+            displayName
+            login
+          }
+          message {
+            fragments {
+              text
+            }
+            userColor
+          }
+        }
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+}

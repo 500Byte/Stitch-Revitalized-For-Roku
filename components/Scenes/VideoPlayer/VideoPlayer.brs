@@ -97,8 +97,20 @@ end sub
 sub initChat()
     if not m.top.chatStarted
         m.top.chatStarted = true
-        ' Setting channel starts ChatJob and EmoteJob, so leave it unset when chat is off.
+        ' Setting channel starts ChatJob/VodChatJob and EmoteJob, so leave it unset when chat is off.
         if not isChatEnabled() then return
+        isVodContent = (m.top.contentRequested <> invalid and m.top.contentRequested.contentType = "VOD")
+        m.chatWindow.isVod = isVodContent
+        if isVodContent
+            vodId = ""
+            if m.video <> invalid and m.video.video_id <> invalid and m.video.video_id <> ""
+                vodId = m.video.video_id
+            else if m.top.contentRequested <> invalid and m.top.contentRequested.contentId <> invalid
+                vodId = m.top.contentRequested.contentId
+            end if
+            m.chatWindow.videoId = vodId
+            if m.video <> invalid then m.chatWindow.videoPosition = m.video.position
+        end if
         m.chatWindow.channel_id = m.top.contentRequested.streamerId
         m.chatWindow.channel = m.top.contentRequested.streamerLogin
         if get_user_setting("ChatOption", "true") = "true"
@@ -356,7 +368,7 @@ sub playContent(isRecovery = false as boolean)
         m.PlayerTask.video = m.video
         m.PlayerTask.control = "RUN"
 
-        if isLiveContent
+        if isLiveContent or (m.top.contentRequested <> invalid and m.top.contentRequested.contentType = "VOD")
             initChat()
         end if
     end if
@@ -568,6 +580,9 @@ sub onPositionChanged()
         ' instead of rewinding to the last bookmark pushed to Twitch.
         m.lastVodId = m.video.video_id
         m.lastVodPosition = m.video.position
+        if m.chatWindow <> invalid and m.chatWindow.isVod = true
+            m.chatWindow.videoPosition = m.video.position
+        end if
     end if
 
 end sub
