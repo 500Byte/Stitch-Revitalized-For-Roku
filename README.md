@@ -6,6 +6,11 @@
 
 A feature-complete Twitch client for Roku.
 
+> **Personal fork — experimentation.** This fork is maintained for personal use and
+> experimentation. It is not the official channel, it is not supported, and it may be broken at any
+> time. Upstream is [jeremy-albinet/Stitch-Revitalized-For-Roku](https://github.com/jeremy-albinet/Stitch-Revitalized-For-Roku).
+
+
 | Cumulative installs | New installs (Mar 2025) | Avg daily viewers | Avg session | Hours streamed (Mar 2025) |
 |---|---|---|---|---|
 | 694,449 | 93,163 | 16,598 | ~2h | 971,218 |
